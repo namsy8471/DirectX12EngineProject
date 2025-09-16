@@ -1,6 +1,18 @@
 # Prerequisites
 *.d
 
+# Visual Studio Cache
+.vs/
+
+# Build Output Folders
+x64/
+Debug/
+Release/
+*.pdb
+*.ilk
+*.suo
+*.user
+
 # Compiled Object files
 *.slo
 *.lo
@@ -30,3 +42,6 @@
 *.exe
 *.out
 *.app
+
+# Do not ignore this
+!/DirectX12EngineProject

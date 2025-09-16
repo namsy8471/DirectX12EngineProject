@@ -98,10 +98,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(solutionDir)src</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -110,12 +112,13 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(solutionDir)src</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -123,16 +126,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="DirectX12EngineProject.h" />
-    <ClInclude Include="framework.h" />
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="targetver.h" />
+    <ClInclude Include="src\Framework\AppFramework.h" />
+    <ClInclude Include="src\D3D12\D3D12App.h" />
+    <ClInclude Include="src\Core\DirectX12EngineProject.h" />
+    <ClInclude Include="src\Core\framework.h" />
+    <ClInclude Include="src\Core\Resource.h" />
+    <ClInclude Include="src\Core\targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DirectX12EngineProject.cpp" />
+    <ClCompile Include="src\Framework\AppFramework.cpp" />
+    <ClCompile Include="src\D3D12\D3D12App.cpp" />
+    <ClCompile Include="src\Core\DirectX12EngineProject.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="DirectX12EngineProject.rc" />
+    <ResourceCompile Include="src\Core\DirectX12EngineProject.rc" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="DirectX12EngineProject.ico" />
