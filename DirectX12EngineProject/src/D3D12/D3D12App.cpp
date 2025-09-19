@@ -1,5 +1,7 @@
 #include "D3D12App.h"
 
+#include "../Utils/Utils.h"
+
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
@@ -12,26 +14,46 @@ D3D12App::D3D12App(HWND hWnd)
 {
 	using namespace Microsoft::WRL;
 
-#ifdef DEBUG
+#ifdef _DEBUG
 	ComPtr<ID3D12Debug> debugController;
-	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))
 	{
 		debugController->EnableDebugLayer();
 	}
+
+	Debug::Print(L"Debug Controller Load Complete!");
+
+	ComPtr<ID3D12Debug1> debugController1;
+	ThrowIfFailed(debugController.As(&debugController1))
+	{
+		debugController1->SetEnableGPUBasedValidation(TRUE);
+	}
+
+
+	Debug::Print(L"Debug Controller1 Load Complete!");
 #endif // DEBUG
 
 	// Create DXGI Factory
 	ComPtr<IDXGIFactory4> factory;
-	CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG ,IID_PPV_ARGS(&factory));
+	ThrowIfFailed(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory)))
+	{
+		Debug::Print(L"Factory2 Load Complete!");
+	}
 
-	factory.As(&m_factory);
+	ThrowIfFailed(factory.As(&m_factory))
+	{
+		Debug::Print(L"Factory4 Load Complete!");
+	}
 
 	// Create D3D12 Device
-	D3D12CreateDevice(
+	ThrowIfFailed(D3D12CreateDevice(
 		nullptr, // default adapter
 		D3D_FEATURE_LEVEL_12_0,
 		IID_PPV_ARGS(&m_device)
-	);
+	))
+	{
+		Debug::Print(L"D3D12 Device Load Complete!");
+	}
 
 	// Describe and create the command queue.
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -39,7 +61,10 @@ D3D12App::D3D12App(HWND hWnd)
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT; // direct, compute, copy
 	queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 
-	m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue));
+	ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)))
+	{
+		Debug::Print(L"Command Queue Load Complete!");
+	}
 
 	// Create Swap Chain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -52,16 +77,23 @@ D3D12App::D3D12App(HWND hWnd)
 	swapChainDesc.SampleDesc.Count = 1; // don't use multi-sampling
 
 	ComPtr<IDXGISwapChain1> swapChain;
-	factory->CreateSwapChainForHwnd(
+	ThrowIfFailed(factory->CreateSwapChainForHwnd(
 		m_commandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
 		hWnd,
 		&swapChainDesc,
 		nullptr,
 		nullptr,
 		&swapChain
-	);
+	))
+	{
+		Debug::Print(L"Swap Chain Load Complete!");
+	}
 
-	swapChain.As(&m_swapChain);
+	ThrowIfFailed(swapChain.As(&m_swapChain))
+	{
+		Debug::Print(L"Swap Chain3 Load Complete!");
+	}
+	// This sample does not support fullscreen transitions.
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
 	// Create Descriptor Heaps
@@ -82,24 +114,44 @@ D3D12App::D3D12App(HWND hWnd)
 		m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
 		// 다음 RTV를 저장할 위치로 핸들을 이동합니다.
 		rtvHandle.ptr += m_rtvDescriptorSize;
+
+		Debug::Print(L"Render Target View [" + std::to_wstring(n) + L"] Load Complete!");
 	}
 
-	// Create Command Allocator
-	m_device->CreateCommandAllocator(
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(&m_commandAllocator)
-	);
+	// Create Command Allocators
+	for(UINT n = 0; n < FrameCount; n++)
+	{
+		ThrowIfFailed(m_device->CreateCommandAllocator(
+			D3D12_COMMAND_LIST_TYPE_DIRECT,
+			IID_PPV_ARGS(&m_commandAllocators[n])
+		))
+		{
+			Debug::Print(L"Command Allocator [" + std::to_wstring(n) + L"] Load Complete!");
+		}
+	}
 
 	// Create Command List
-	m_device->CreateCommandList(
+	ThrowIfFailed(m_device->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		m_commandAllocator.Get(),
+		m_commandAllocators[m_frameIndex].Get(),
 		nullptr,
 		IID_PPV_ARGS(&m_commandList)
-	);
+	))
+	{
+		Debug::Print(L"Command List Load Complete!");
+	}
 
 	m_commandList->Close();
+
+	// Fence & Event
+	ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)))
+	{
+		Debug::Print(L"Fence Load Complete!");
+	}
+
+	m_fenceValues[m_frameIndex] = 0;
+	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
 D3D12App::~D3D12App()
@@ -113,8 +165,10 @@ bool D3D12App::Initialize()
 
 void D3D12App::Render()
 {
-	m_commandAllocator->Reset();
-	m_commandList->Reset(m_commandAllocator.Get(), nullptr);
+	WaitForFrame(m_frameIndex);
+
+	m_commandAllocators[m_frameIndex]->Reset();
+	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
 
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -144,6 +198,24 @@ void D3D12App::Render()
 	m_swapChain->Present(1, 0);
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+}
+
+// 이 슬롯의 이전 제출이 아직 안 끝났으면 기다린다
+void D3D12App::WaitForFrame(UINT frameIndex)
+{
+	if(m_fence->GetCompletedValue() < m_fenceValues[frameIndex])
+	{
+		ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent));
+		WaitForSingleObject(m_fenceEvent, INFINITE);
+	}
+}
+
+// 이 슬롯이 다시 돌아올 때까지 기다릴 값을 갱신한다
+void D3D12App::SignalFrame(UINT frameIndex)
+{
+	const UINT64 v = m_fenceValues[frameIndex] + 1; // 다음 값
+	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), v));
+	m_fenceValues[frameIndex] = v; // 이 슬롯이 다시 돌아올 때까지 기다릴 값
 }
 
 void D3D12App::Resize(UINT width, UINT height)
