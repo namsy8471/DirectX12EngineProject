@@ -64,4 +64,7 @@
       <Filter>리소스 파일</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="src\Shaders\DefaultTriangle.hlsl" />
+  </ItemGroup>
 </Project>

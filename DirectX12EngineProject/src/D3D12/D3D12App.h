@@ -10,14 +10,13 @@ class D3D12App
 public:
 	D3D12App(HWND hWnd);
 	~D3D12App();
-	bool Initialize();
 	void Render();
-	
+
 	void Resize(UINT width, UINT height);
 
 private:
-	void WaitForFrame(UINT frameIndex);
-	void SignalFrame(UINT frameIndex);
+	void WaitForGPU();
+	void MoveToNextFrame();
 
 	Microsoft::WRL::ComPtr<struct IDXGIFactory4> m_factory;
 	Microsoft::WRL::ComPtr<struct ID3D12Device> m_device;
@@ -33,7 +32,9 @@ private:
 	UINT m_frameIndex;
 
 	Microsoft::WRL::ComPtr<struct ID3D12Fence> m_fence;
-	UINT64 m_fenceValues[FrameCount] = {};
+	UINT64 m_fenceValue = 0;
 	HANDLE m_fenceEvent = nullptr;
+
+	Microsoft::WRL::ComPtr<struct ID3D12PipelineState> m_pso;
 };
 

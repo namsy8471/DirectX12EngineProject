@@ -39,7 +39,7 @@ namespace Debug
 {
     inline void Print(const std::wstring msg)
     {
-        OutputDebugString(msg.c_str());
+        OutputDebugString((msg + L"\n").c_str());
         std::wcout << msg << std::endl;
     }
 }

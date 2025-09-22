@@ -150,73 +150,86 @@ D3D12App::D3D12App(HWND hWnd)
 		Debug::Print(L"Fence Load Complete!");
 	}
 
-	m_fenceValues[m_frameIndex] = 0;
+	m_fenceValue = 0;
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
 D3D12App::~D3D12App()
 {
-}
-
-bool D3D12App::Initialize()
-{
-	return false;
+	// Ensure that the GPU is no longer referencing resources that are about to be
+	// cleaned up by the destructor.
+	WaitForGPU();
+	CloseHandle(m_fenceEvent);
 }
 
 void D3D12App::Render()
 {
-	WaitForFrame(m_frameIndex);
+	// 이 슬롯이 다시 돌아올 때까지 기다릴 값을 갱신한다
+	ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
+	ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
 
-	m_commandAllocators[m_frameIndex]->Reset();
-	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
-
+	// Rendering commands
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	barrier.Transition.pResource = m_renderTargets[m_frameIndex].Get();
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	
+	// 리소스 상태 전환
 	m_commandList->ResourceBarrier(1, &barrier);
 
+	// Render Target 설정
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
 	rtvHandle.ptr += m_frameIndex * m_rtvDescriptorSize;
 
+	// Set the render target for the output merger stage (the output of the pipeline)
 	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
 	m_commandList->ResourceBarrier(1, &barrier);
 
-	m_commandList->Close();
-
+	ThrowIfFailed(m_commandList->Close());
 	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	m_swapChain->Present(1, 0);
+	MoveToNextFrame();
+}
+
+void D3D12App::MoveToNextFrame()
+{
+	const UINT64 currentFenceValue = m_fenceValue; // 다음 값
+	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
+
+	ThrowIfFailed(m_swapChain->Present(1, 0)); // VSync
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-}
 
-// 이 슬롯의 이전 제출이 아직 안 끝났으면 기다린다
-void D3D12App::WaitForFrame(UINT frameIndex)
-{
-	if(m_fence->GetCompletedValue() < m_fenceValues[frameIndex])
+	if (m_fence->GetCompletedValue() < m_fenceValue)
 	{
-		ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent));
+		ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
 		WaitForSingleObject(m_fenceEvent, INFINITE);
 	}
+
+	m_fenceValue++;
 }
 
-// 이 슬롯이 다시 돌아올 때까지 기다릴 값을 갱신한다
-void D3D12App::SignalFrame(UINT frameIndex)
+// GPU가 모든 명령을 처리할 때까지 기다린다
+void D3D12App::WaitForGPU()
 {
-	const UINT64 v = m_fenceValues[frameIndex] + 1; // 다음 값
-	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), v));
-	m_fenceValues[frameIndex] = v; // 이 슬롯이 다시 돌아올 때까지 기다릴 값
+	// 현재 값으로 신호를 보낸다
+	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValue));
+
+	// 이 값에 도달할 때까지 기다린다
+	ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
+	WaitForSingleObject(m_fenceEvent, INFINITE);
+	
+	// 다음 값을 위해 1 증가시킨다
+	m_fenceValue++;
 }
+
 
 void D3D12App::Resize(UINT width, UINT height)
 {
