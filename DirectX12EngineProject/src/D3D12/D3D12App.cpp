@@ -1,59 +1,43 @@
 #include "D3D12App.h"
 
 #include "../Utils/Utils.h"
+#include "../Managers/ImGuiManager.h"
 
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <d3dcompiler.h>
-
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3dcompiler.lib")
-
-D3D12App::D3D12App(HWND hWnd)
+D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 {
 	using namespace Microsoft::WRL;
 
 #ifdef _DEBUG
 	ComPtr<ID3D12Debug> debugController;
-	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))
-	{
-		debugController->EnableDebugLayer();
-	}
+	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
+	debugController->EnableDebugLayer();
 
 	Debug::Print(L"Debug Controller Load Complete!");
 
 	ComPtr<ID3D12Debug1> debugController1;
 	ThrowIfFailed(debugController.As(&debugController1))
-	{
-		debugController1->SetEnableGPUBasedValidation(TRUE);
-	}
-
-
+	debugController1->SetEnableGPUBasedValidation(TRUE);
+	
 	Debug::Print(L"Debug Controller1 Load Complete!");
 #endif // DEBUG
 
 	// Create DXGI Factory
 	ComPtr<IDXGIFactory4> factory;
-	ThrowIfFailed(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory)))
-	{
-		Debug::Print(L"Factory2 Load Complete!");
-	}
+	ThrowIfFailed(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory)));
+	Debug::Print(L"Factory2 Load Complete!");
 
-	ThrowIfFailed(factory.As(&m_factory))
-	{
-		Debug::Print(L"Factory4 Load Complete!");
-	}
+	ThrowIfFailed(factory.As(&m_factory));
+	Debug::Print(L"Factory4 Load Complete!");
 
 	// Create D3D12 Device
 	ThrowIfFailed(D3D12CreateDevice(
 		nullptr, // default adapter
 		D3D_FEATURE_LEVEL_12_0,
 		IID_PPV_ARGS(&m_device)
-	))
-	{
-		Debug::Print(L"D3D12 Device Load Complete!");
-	}
+	));
+	
+	Debug::Print(L"D3D12 Device Load Complete!");
+	
 
 	// Describe and create the command queue.
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -69,8 +53,8 @@ D3D12App::D3D12App(HWND hWnd)
 	// Create Swap Chain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.BufferCount = 2; // double buffering
-	swapChainDesc.Width = 1280; // TODO: use window width
-	swapChainDesc.Height = 720; // TODO: use window height
+	swapChainDesc.Width = width; // TODO: use window width
+	swapChainDesc.Height = height; // TODO: use window height
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // this is the most common swapchain format
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; // all modern apps must use this SwapEffect
@@ -84,15 +68,13 @@ D3D12App::D3D12App(HWND hWnd)
 		nullptr,
 		nullptr,
 		&swapChain
-	))
-	{
-		Debug::Print(L"Swap Chain Load Complete!");
-	}
+	));
+	Debug::Print(L"Swap Chain Load Complete!");
+	
 
 	ThrowIfFailed(swapChain.As(&m_swapChain))
-	{
-		Debug::Print(L"Swap Chain3 Load Complete!");
-	}
+	Debug::Print(L"Swap Chain3 Load Complete!");
+	
 	// This sample does not support fullscreen transitions.
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
@@ -103,7 +85,7 @@ D3D12App::D3D12App(HWND hWnd)
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
 	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
+	Debug::Print(L"Render Target View Heap Load Complete!");
 	
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
 	for(UINT n = 0; n < 2; n++)
@@ -119,15 +101,15 @@ D3D12App::D3D12App(HWND hWnd)
 	}
 
 	// Create Command Allocators
-	for(UINT n = 0; n < FrameCount; n++)
+	for(UINT n = 0; n < FRAME_COUNT; n++)
 	{
 		ThrowIfFailed(m_device->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
 			IID_PPV_ARGS(&m_commandAllocators[n])
-		))
-		{
-			Debug::Print(L"Command Allocator [" + std::to_wstring(n) + L"] Load Complete!");
-		}
+		));
+		
+		Debug::Print(L"Command Allocator [" + std::to_wstring(n) + L"] Load Complete!");
+		
 	}
 
 	// Create Command List
@@ -137,21 +119,89 @@ D3D12App::D3D12App(HWND hWnd)
 		m_commandAllocators[m_frameIndex].Get(),
 		nullptr,
 		IID_PPV_ARGS(&m_commandList)
-	))
-	{
-		Debug::Print(L"Command List Load Complete!");
-	}
+	));
+	Debug::Print(L"Command List Load Complete!");
+	
 
 	m_commandList->Close();
 
 	// Fence & Event
-	ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)))
-	{
-		Debug::Print(L"Fence Load Complete!");
-	}
+	ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+	Debug::Print(L"Fence Load Complete!");
+	
 
 	m_fenceValue = 0;
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+	// Load Shaders
+	auto dir = GetExeDirectory();
+	auto vsBytecode = ReadShaderBytecode(dir + L"\\SimpleVS.cso");
+	auto psBytecode = ReadShaderBytecode(dir + L"\\SimplePS.cso");
+
+	D3D12_SHADER_BYTECODE vertexShaderBytecode = {};
+	vertexShaderBytecode.pShaderBytecode = vsBytecode.data();
+	vertexShaderBytecode.BytecodeLength = vsBytecode.size();
+
+	D3D12_SHADER_BYTECODE pixelShaderBytecode = {};
+	pixelShaderBytecode.pShaderBytecode = psBytecode.data();
+	pixelShaderBytecode.BytecodeLength = psBytecode.size();
+	
+	Debug::Print(L"Shader Bytecode Load Complete!");
+
+	// Create Root Signature
+	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+	rootSignatureDesc.NumParameters = 0;
+	rootSignatureDesc.pParameters = nullptr;
+	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+
+	ThrowIfFailed(D3D12SerializeRootSignature(
+		&rootSignatureDesc,
+		D3D_ROOT_SIGNATURE_VERSION_1,
+		&signature,
+		&error));
+
+	ThrowIfFailed(m_device->CreateRootSignature(
+		0,
+		signature->GetBufferPointer(),
+		signature->GetBufferSize(),
+		IID_PPV_ARGS(&m_rootSignature)));
+	
+	Debug::Print(L"Root Signature Load Complete!");
+	
+
+	// Create Pipeline State Object(PSO)
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.pRootSignature = m_rootSignature.Get();
+	psoDesc.VS = vertexShaderBytecode;
+	psoDesc.PS = pixelShaderBytecode;
+
+	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	
+	psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	psoDesc.InputLayout = { nullptr, 0 }; // TODO: Set Input Layout
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = m_renderTargets[0]->GetDesc().Format;
+	psoDesc.SampleMask = UINT_MAX;
+	psoDesc.SampleDesc.Count = 1;
+
+	ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pso)));
+	Debug::Print(L"Pipeline State Object Load Complete!");
+	
+
+	SetViewportAndScissorRect(width, height);
+
+#ifdef _DEBUG
+	m_imguiManager = std::make_unique<ImGuiManager>
+		(m_device.Get(), m_commandQueue.Get(), hWnd, FRAME_COUNT);
+	Debug::Print(L"ImGui Manager Load Complete!");
+#endif // _DEBUG
 }
 
 D3D12App::~D3D12App()
@@ -167,6 +217,14 @@ void D3D12App::Render()
 	// 이 슬롯이 다시 돌아올 때까지 기다릴 값을 갱신한다
 	ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
 	ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
+
+	// 루트 시그니처와 PSO를 파이프라인에 설정합니다.
+	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	m_commandList->SetPipelineState(m_pso.Get());
+
+	// 뷰포트와 시저렉트 설정 (이전에 추가했어야 함)
+	m_commandList->RSSetViewports(1, &m_viewport);
+	m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
 	// Rendering commands
 	D3D12_RESOURCE_BARRIER barrier = {};
@@ -187,6 +245,20 @@ void D3D12App::Render()
 	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+	// 2. 프리미티브 토폴로지 설정 (어떤 종류의 도형을 그릴지)
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// 3. 그리기 명령!
+	// 정점 3개, 인스턴스 1개를 그리라는 명령입니다.
+	// 이 명령이 실행되면 VSMain이 3번 (vertexID = 0, 1, 2) 호출됩니다.
+	m_commandList->DrawInstanced(3, 1, 0, 0);
+
+	//새로운 ImGui 프레임 시작
+#ifdef _DEBUG
+	m_imguiManager->NewFrame();
+	m_imguiManager->Render(m_commandList.Get());
+#endif // _DEBUG
 
 	std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
 	m_commandList->ResourceBarrier(1, &barrier);
@@ -233,4 +305,62 @@ void D3D12App::WaitForGPU()
 
 void D3D12App::Resize(UINT width, UINT height)
 {
+	if(width == m_viewport.Width && height == m_viewport.Height)
+		return;
+
+	WaitForGPU();
+
+	// 기존의 렌더 타겟을 해제합니다.
+	for (UINT n = 0; n < FRAME_COUNT; n++)
+	{
+		m_renderTargets[n].Reset();
+	}
+
+	// 스왑 체인의 버퍼 크기를 변경합니다.
+	ThrowIfFailed(m_swapChain->ResizeBuffers(
+		FRAME_COUNT,
+		width,
+		height,
+		DXGI_FORMAT_R8G8B8A8_UNORM,
+		0
+	));
+
+	// m_frameIndex를 최신 상태로 유지합니다.
+	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+	// 각 버퍼에 대한 RTV를 다시 생성합니다.
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+
+	for (UINT n = 0; n < FRAME_COUNT; n++)
+	{
+		m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n]));
+		m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+		rtvHandle.ptr += m_rtvDescriptorSize;
+	}
+
+	SetViewportAndScissorRect(width, height);
+}
+
+void D3D12App::SetViewportAndScissorRect(UINT width, UINT height)
+{
+	// 뷰포트(Viewport) 설정
+	// 뷰포트는 렌더링 결과물이 그려질 렌더 타겟의 영역을 정의합니다.
+	m_viewport.TopLeftX = 0.0f;             // 렌더링 영역의 왼쪽 위 X 좌표
+	m_viewport.TopLeftY = 0.0f;             // 렌더링 영역의 왼쪽 위 Y 좌표
+	m_viewport.Width = static_cast<float>(width);   // 렌더링 영역의 너비
+	m_viewport.Height = static_cast<float>(height); // 렌더링 영역의 높이
+	m_viewport.MinDepth = 0.0f;             // 깊이 버퍼의 최소 깊이 값 (항상 0.0f)
+	m_viewport.MaxDepth = 1.0f;             // 깊이 버퍼의 최대 깊이 값 (항상 1.0f)
+
+	Debug::Print(L"Viewport Set: " + std::to_wstring(width) + L"x" + std::to_wstring(height));
+
+	// 시저 렉트(Scissor Rectangle) 설정
+	// 시저 렉트는 픽셀 셰이더의 영향을 받는 영역을 정의합니다. 이 사각형 바깥의 픽셀들은
+	// 렌더링되지 않습니다 (가위로 잘라내는 효과).
+	m_scissorRect.left = 0;                 // 잘라낼 사각형의 왼쪽 좌표
+	m_scissorRect.top = 0;                  // 잘라낼 사각형의 위쪽 좌표
+	m_scissorRect.right = width;          // 잘라낼 사각형의 오른쪽 좌표
+	m_scissorRect.bottom = height;        // 잘라낼 사각형의 아래쪽 좌표
+
+	Debug::Print(L"Scissor Rect Set: " + std::to_wstring(width) + L"x" + std::to_wstring(height));
 }

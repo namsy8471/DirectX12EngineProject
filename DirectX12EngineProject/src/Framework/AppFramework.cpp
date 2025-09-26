@@ -6,7 +6,7 @@
 
 #include <stdexcept>
 
-AppFramework::AppFramework(HINSTANCE hInstance, int nCmdShow)
+AppFramework::AppFramework(HINSTANCE hInstance, int nCmdShow, UINT width, UINT height) : m_width(width), m_height(height)
 {
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_DIRECTX12ENGINEPROJECT, szWindowClass, MAX_LOADSTRING);
@@ -17,7 +17,7 @@ AppFramework::AppFramework(HINSTANCE hInstance, int nCmdShow)
         throw std::runtime_error("Failed to initialize application instance.");
 	}
 
-	m_d3dApp = std::make_unique<D3D12App>(m_hWnd);
+	m_d3dApp = std::make_unique<D3D12App>(m_hWnd, m_width, m_height);
 }
 
 AppFramework::~AppFramework()
@@ -69,6 +69,15 @@ LRESULT AppFramework::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPAR
         }
     }
     break;
+    case WM_SIZE:
+    {
+        if (m_d3dApp)
+        {
+            m_width = LOWORD(lParam);
+            m_height = HIWORD(lParam);
+            m_d3dApp->Resize(m_width, m_height);
+        }
+	}
     case WM_PAINT:
     {
         //PAINTSTRUCT ps;
@@ -88,9 +97,14 @@ LRESULT AppFramework::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPAR
     return 0;
 }
 
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 LRESULT CALLBACK AppFramework::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	AppFramework* app = nullptr;
+
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+		return true;
 
     if (message == WM_NCCREATE)
     {
@@ -118,7 +132,7 @@ BOOL AppFramework::InitInstance(HINSTANCE hInstance, int nCmdShow)
     m_hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
     m_hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720,
+        CW_USEDEFAULT, CW_USEDEFAULT, m_width, m_height,
         nullptr,
         LoadMenu(m_hInst, MAKEINTRESOURCE(IDC_DIRECTX12ENGINEPROJECT)), 
         hInstance, 
@@ -137,7 +151,7 @@ BOOL AppFramework::InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 bool AppFramework::MyRegisterClass(HINSTANCE hInstance) const
 {
-    WNDCLASSEXW wcex;
+    WNDCLASSEXW wcex = {};
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 

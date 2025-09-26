@@ -8,7 +8,7 @@ const int MAX_LOADSTRING = 100;
 class AppFramework
 {
 public:
-	AppFramework(HINSTANCE hInstance, int nCmdShow);
+	AppFramework(HINSTANCE hInstance, int nCmdShow, UINT width, UINT height);
 	~AppFramework();
 	void Run();
 
@@ -17,6 +17,9 @@ private:
 	HWND m_hWnd;
 	WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
 	WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
+
+	UINT m_width;
+	UINT m_height;
 
 	std::unique_ptr<class D3D12App> m_d3dApp;
 

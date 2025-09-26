@@ -13,11 +13,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
 #ifdef _DEBUG
-    CreateConsole();
+    Debug::CreateConsole();
 #endif // DEBUG
 
+	UINT width = 1280;
+	UINT height = 720;
+
 	std::unique_ptr<AppFramework> pApp = 
-        std::make_unique<AppFramework>(hInstance, nCmdShow);
+        std::make_unique<AppFramework>(hInstance, nCmdShow, width, height);
     
     pApp->Run();
 

@@ -4,6 +4,7 @@
 #include <fcntl.h>  // for _O_TEXT
 #include <string>
 #include <comdef.h> // for _com_error
+#include <fstream>  // for std::ifstream
 
 DxException::DxException(HRESULT hr, const wchar_t* functionName, const wchar_t* filename, int lineNumber) :
     m_errorCode(hr)
@@ -33,7 +34,7 @@ DxException::DxException(HRESULT hr, const wchar_t* functionName, const wchar_t*
 }
 
 
-void CreateConsole()
+void Debug::CreateConsole()
 {
     // AllocConsole() 함수로 새로운 콘솔 창을 생성합니다.
     if (!AllocConsole())
@@ -62,4 +63,40 @@ void CreateConsole()
     std::wclog.imbue(std::locale("korean"));
 
     std::cout << "Console Created Successfully!" << std::endl;
+}
+
+// 실행 파일(.exe)이 있는 디렉터리 경로를 반환하는 함수
+std::wstring GetExeDirectory()
+{
+    wchar_t buffer[MAX_PATH];
+    GetModuleFileNameW(NULL, buffer, MAX_PATH);
+    return std::filesystem::path(buffer).parent_path().wstring();
+}
+
+std::string WstringToString(const std::wstring& wstr)
+{
+    // wstring을 string으로 변환하는 함수
+    // 여기서는 간단히 _bstr_t를 사용하여 변환합니다.
+    _bstr_t bstr(wstr.c_str());
+    return std::string(bstr);
+}
+
+std::vector<byte> ReadShaderBytecode(const std::wstring& filename)
+{
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if(!file.is_open())
+    {
+        Debug::Print(L"Failed to open shader file: " + filename);
+		throw std::runtime_error("Failed to open shader file. Filename : {}" + WstringToString(filename));
+	}
+
+	size_t fileSize = static_cast<size_t>(file.tellg());
+	std::vector<byte> buffer(fileSize);
+
+	file.seekg(0);
+	file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+    file.close();
+
+    return buffer;
 }
