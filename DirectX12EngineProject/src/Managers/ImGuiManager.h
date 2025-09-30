@@ -13,7 +13,6 @@ public:
 	void Render(ID3D12GraphicsCommandList* cmdList);
 
 private:
-
 	// Singleton for callback functions without Capture
 	static ImGuiManager* s_instance;
 

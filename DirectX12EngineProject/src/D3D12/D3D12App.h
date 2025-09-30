@@ -40,9 +40,12 @@ private:
 
 	Microsoft::WRL::ComPtr<struct IDXGISwapChain3> m_swapChain;
 	Microsoft::WRL::ComPtr<struct ID3D12DescriptorHeap> m_rtvHeap;
-	Microsoft::WRL::ComPtr<struct ID3D12DescriptorHeap> m_imguiDescHeap;
+	Microsoft::WRL::ComPtr<struct ID3D12Resource> m_renderTargetBuffers[FRAME_COUNT];
 
-	Microsoft::WRL::ComPtr<struct ID3D12Resource> m_renderTargets[FRAME_COUNT];
+	Microsoft::WRL::ComPtr<struct ID3D12DescriptorHeap> m_dsvHeap;
+	Microsoft::WRL::ComPtr<struct ID3D12Resource> m_depthStencilBuffer;
+
+	Microsoft::WRL::ComPtr<struct ID3D12DescriptorHeap> m_imguiDescHeap;
 
 	UINT m_rtvDescriptorSize;
 	UINT m_frameIndex;

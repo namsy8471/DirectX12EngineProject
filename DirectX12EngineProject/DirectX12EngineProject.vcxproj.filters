@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Core\framework.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="src\Core\targetver.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -49,6 +46,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="src\Utils\DescriptorHeapAllocator.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="src\D3DX12\d3dx12.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

@@ -3,6 +3,8 @@
 #include "../Utils/Utils.h"
 #include "../Managers/ImGuiManager.h"
 
+#include "../D3DX12/d3dx12.h" // Helper structs for D3D12 (like CD3DX12_RESOURCE_BARRIER)
+
 D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 {
 	using namespace Microsoft::WRL;
@@ -78,26 +80,66 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 	// This sample does not support fullscreen transitions.
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	// Create Descriptor Heaps
-	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-	rtvHeapDesc.NumDescriptors = 2; // double buffering
-	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	Debug::Print(L"Render Target View Heap Load Complete!");
-	
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-	for(UINT n = 0; n < 2; n++)
+	// Create RTV Heaps
 	{
-		// 스왑 체인으로부터 n번째 버퍼 리소스를 가져옵니다.
-		m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n]));
-		// 해당 버퍼에 대한 RTV를 생성하여 힙에 저장합니다.
-		m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
-		// 다음 RTV를 저장할 위치로 핸들을 이동합니다.
-		rtvHandle.ptr += m_rtvDescriptorSize;
+		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+		rtvHeapDesc.NumDescriptors = 2; // double buffering
+		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
+		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		Debug::Print(L"Render Target View Heap Load Complete!");
 
-		Debug::Print(L"Render Target View [" + std::to_wstring(n) + L"] Load Complete!");
+
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+		for (UINT n = 0; n < 2; n++)
+		{
+			// 스왑 체인으로부터 n번째 버퍼 리소스를 가져옵니다.
+			m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargetBuffers[n]));
+			// 해당 버퍼에 대한 RTV를 생성하여 힙에 저장합니다.
+			m_device->CreateRenderTargetView(m_renderTargetBuffers[n].Get(), nullptr, rtvHandle);
+			// 다음 RTV를 저장할 위치로 핸들을 이동합니다.
+			rtvHandle.ptr += m_rtvDescriptorSize;
+
+			Debug::Print(L"Render Target View [" + std::to_wstring(n) + L"] Load Complete!");
+		}
+	}
+
+	{
+		// Create DSV Heap
+		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+		dsvHeapDesc.NumDescriptors = 1; // 깊이 버퍼는 보통 1개만 사용합니다.
+		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
+
+		// 깊이/스텐실 버퍼를 위한 리소스를 생성합니다.
+		D3D12_RESOURCE_DESC depthStencilDesc = {};
+		depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		depthStencilDesc.Alignment = 0;
+		depthStencilDesc.Width = width;
+		depthStencilDesc.Height = height;
+		depthStencilDesc.DepthOrArraySize = 1;
+		depthStencilDesc.MipLevels = 1;
+		depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT; // 32비트 깊이 포맷
+		depthStencilDesc.SampleDesc.Count = 1;
+		depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+		// 최적의 Clear 값을 설정합니다.
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Format = DXGI_FORMAT_D32_FLOAT;
+		optClear.DepthStencil.Depth = 1.0f;
+		optClear.DepthStencil.Stencil = 0;
+
+		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&depthStencilDesc,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			&optClear,
+			IID_PPV_ARGS(&m_depthStencilBuffer)));
 	}
 
 	// Create Command Allocators
@@ -129,11 +171,11 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 	ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
 	Debug::Print(L"Fence Load Complete!");
 	
-
 	m_fenceValue = 0;
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 	// Load Shaders
+
 	auto dir = GetExeDirectory();
 	auto vsBytecode = ReadShaderBytecode(dir + L"\\SimpleVS.cso");
 	auto psBytecode = ReadShaderBytecode(dir + L"\\SimplePS.cso");
@@ -187,7 +229,7 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
 	psoDesc.NumRenderTargets = 1;
-	psoDesc.RTVFormats[0] = m_renderTargets[0]->GetDesc().Format;
+	psoDesc.RTVFormats[0] = m_renderTargetBuffers[0]->GetDesc().Format;
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.SampleDesc.Count = 1;
 
@@ -230,7 +272,7 @@ void D3D12App::Render()
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	barrier.Transition.pResource = m_renderTargets[m_frameIndex].Get();
+	barrier.Transition.pResource = m_renderTargetBuffers[m_frameIndex].Get();
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	
@@ -313,7 +355,7 @@ void D3D12App::Resize(UINT width, UINT height)
 	// 기존의 렌더 타겟을 해제합니다.
 	for (UINT n = 0; n < FRAME_COUNT; n++)
 	{
-		m_renderTargets[n].Reset();
+		m_renderTargetBuffers[n].Reset();
 	}
 
 	// 스왑 체인의 버퍼 크기를 변경합니다.
@@ -333,8 +375,8 @@ void D3D12App::Resize(UINT width, UINT height)
 
 	for (UINT n = 0; n < FRAME_COUNT; n++)
 	{
-		m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n]));
-		m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+		m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargetBuffers[n]));
+		m_device->CreateRenderTargetView(m_renderTargetBuffers[n].Get(), nullptr, rtvHandle);
 		rtvHandle.ptr += m_rtvDescriptorSize;
 	}
 
