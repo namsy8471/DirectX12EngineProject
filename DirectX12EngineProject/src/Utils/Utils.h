@@ -48,10 +48,16 @@ namespace Debug
 {
     void CreateConsole();
 
-    inline void Print(const std::wstring msg)
+    inline void Print(const std::wstring& msg)
     {
-        OutputDebugString((msg + L"\n").c_str());
+        OutputDebugStringW((msg + L"\n").c_str());
         std::wcout << msg << std::endl;
+    }
+
+    inline void Print(const std::string& msg)
+    {
+        OutputDebugStringA((msg + "\n").c_str());
+        std::cout << msg << std::endl;
     }
 }
 

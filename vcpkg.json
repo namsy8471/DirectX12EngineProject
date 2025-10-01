@@ -1,0 +1,7 @@
+{
+  "name": "directx12engineproject",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "assimp"
+  ]
+}

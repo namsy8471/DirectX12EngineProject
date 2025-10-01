@@ -2,8 +2,8 @@
 
 #include "../Utils/Utils.h"
 #include "imgui.h"
-#include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
+#include "imgui_impl_dx12.h"
 
 #include <d3d12.h>
 
@@ -11,6 +11,8 @@ ImGuiManager* ImGuiManager::s_instance = nullptr; // 싱글톤 초기화
 
 ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, HWND hWnd, const int FRAME_COUNT)
 {
+	UNREFERENCED_PARAMETER(cmdQueue);
+
 	ImGuiManager::s_instance = this;
 
 	// Create ImGui Descriptor Heap
@@ -26,6 +28,7 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	
 	// 스타일 설정
 	ImGui::StyleColorsDark();
 
@@ -34,6 +37,11 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 
 	m_ImGuiDescHeapAlloc.Create(device, m_imguiDescHeap.Get());
 
+	// 기존의 ImGui 초기화 방식 (더 이상 사용하지 않음)
+	/*ImGui_ImplDX12_Init(device, FRAME_COUNT, DXGI_FORMAT_R8G8B8A8_UNORM, m_imguiDescHeap.Get(),
+		m_imguiDescHeap->GetCPUDescriptorHandleForHeapStart(), m_imguiDescHeap->GetGPUDescriptorHandleForHeapStart());*/
+
+	// 아래는 ImGui 1.89.5 버전부터 지원하는 새로운 초기화 방식 (콜백함수 등록)
 	ImGui_ImplDX12_InitInfo init_info = {};
 	init_info.Device = device;
 	init_info.CommandQueue = cmdQueue;

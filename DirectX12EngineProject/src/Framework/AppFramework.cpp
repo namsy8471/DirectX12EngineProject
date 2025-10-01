@@ -1,6 +1,5 @@
 #include "AppFramework.h"
 
-#include "..\Core\framework.h"
 #include "..\Core\DirectX12EngineProject.h"
 #include "..\D3D12\D3D12App.h"
 
@@ -78,6 +77,8 @@ LRESULT AppFramework::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPAR
             m_d3dApp->Resize(m_width, m_height);
         }
 	}
+    break;
+
     case WM_PAINT:
     {
         //PAINTSTRUCT ps;

@@ -12,6 +12,13 @@
 #ifndef __D3DX12_H__
 #define __D3DX12_H__
 
+// 경고 무시 설정 (Microsoft 제공 코드에서 발생하는 경고)
+#pragma warning(push)
+#pragma warning(disable:4324) // 맞춤 지정자 정렬 관련 경고
+#pragma warning(disable:6001) // 초기화되지 않은 메모리 사용 관련 경고
+#pragma warning(disable:6101) // 미사용 로컬 변수 반환 관련 경고
+#pragma warning(disable:28182) // null 포인터 역참조 가능성 관련 경고
+
 #include "d3d12.h"
 
 #if defined( __cplusplus )
@@ -3433,4 +3440,4 @@ private:
 #endif //__D3DX12_H__
 
 
-
+#pragma warning(pop)

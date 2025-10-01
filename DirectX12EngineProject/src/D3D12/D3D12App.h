@@ -3,6 +3,9 @@
 #include <windows.h>
 #include <wrl.h>
 #include <memory>
+#include <vector>
+
+#include "../Managers/ModelManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -59,5 +62,14 @@ private:
 
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
+
+	std::vector<Vertex> m_vertices;
+	std::vector<UINT> m_indices;
+
+	Microsoft::WRL::ComPtr<struct ID3D12Resource> m_vertexBuffer;
+	Microsoft::WRL::ComPtr<struct ID3D12Resource> m_indexBuffer;
+
+	D3D12_VERTEX_BUFFER_VIEW m_vbView;
+	D3D12_INDEX_BUFFER_VIEW m_ibView;
 };
 

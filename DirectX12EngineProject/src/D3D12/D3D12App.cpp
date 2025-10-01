@@ -192,7 +192,7 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 
 	// Create Root Signature
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-	rootSignatureDesc.NumParameters = 0;
+	rootSignatureDesc.NumParameters = 1;
 	rootSignatureDesc.pParameters = nullptr;
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
@@ -225,7 +225,16 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 	
 	psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
-	psoDesc.InputLayout = { nullptr, 0 }; // TODO: Set Input Layout
+	D3D12_INPUT_ELEMENT_DESC inputLayout[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, Normal),   D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, offsetof(Vertex, TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, Tangent),  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "BITANGENT",0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, Bitangent),D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
+
+	psoDesc.InputLayout = { inputLayout, _countof(inputLayout) };
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
 	psoDesc.NumRenderTargets = 1;
@@ -238,6 +247,56 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 	
 
 	SetViewportAndScissorRect(width, height);
+
+	ModelManager::LoadModel("Dragon 2.5_fbx.fbx", m_vertices, m_indices);
+	Debug::Print(L"Model Load Complete! Vertex Count: " + std::to_wstring(m_vertices.size()) + L", Index Count: " + std::to_wstring(m_indices.size()));
+
+	
+	UINT vbSize = static_cast<UINT>(m_vertices.size() * sizeof(Vertex));
+	UINT ibSize = static_cast<UINT>(m_indices.size() * sizeof(uint32_t));
+
+	// 정점 버퍼 뷰
+	CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+	CD3DX12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vbSize);
+
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&heapProps,
+		D3D12_HEAP_FLAG_NONE,
+		&vbDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr, IID_PPV_ARGS(&m_vertexBuffer))
+	);
+
+	void* vbData;
+	CD3DX12_RANGE readRange(0, 0);
+	m_vertexBuffer->Map(0, &readRange, &vbData);
+	memcpy(vbData, m_vertices.data(), vbSize);
+	m_vertexBuffer->Unmap(0, nullptr);
+
+	m_vbView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vbView.SizeInBytes = vbSize;
+	m_vbView.StrideInBytes = sizeof(Vertex);
+
+	// 인덱스 버퍼 뷰
+	CD3DX12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(ibSize);
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&heapProps,
+		D3D12_HEAP_FLAG_NONE,
+		&ibDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_indexBuffer))
+	);
+
+	void* ibData;
+	m_indexBuffer->Map(0, &readRange, &ibData);
+	memcpy(ibData, m_indices.data(), ibSize);
+	m_indexBuffer->Unmap(0, nullptr);
+
+	m_ibView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_ibView.SizeInBytes = ibSize;
+	m_ibView.Format = DXGI_FORMAT_R32_UINT;
+
 
 #ifdef _DEBUG
 	m_imguiManager = std::make_unique<ImGuiManager>
@@ -288,13 +347,20 @@ void D3D12App::Render()
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-	// 2. 프리미티브 토폴로지 설정 (어떤 종류의 도형을 그릴지)
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_commandList->IASetVertexBuffers(0, 1, &m_vbView); // 정점 버퍼 설정
+	m_commandList->IASetIndexBuffer(&m_ibView); // 인덱스 버퍼 설정
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // 프리미티브 토폴로지 설정 (어떤 종류의 도형을 그릴지)
 
 	// 3. 그리기 명령!
 	// 정점 3개, 인스턴스 1개를 그리라는 명령입니다.
 	// 이 명령이 실행되면 VSMain이 3번 (vertexID = 0, 1, 2) 호출됩니다.
-	m_commandList->DrawInstanced(3, 1, 0, 0);
+	m_commandList->DrawIndexedInstanced(
+		static_cast<UINT>(m_indices.size()),
+		1,
+		0,
+		0,
+		0
+	);
 
 	//새로운 ImGui 프레임 시작
 #ifdef _DEBUG
