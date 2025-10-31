@@ -72,12 +72,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IntDir>$Build\$obj\$(ProjectName)</IntDir>
-    <OutDir>$(SolutionDir)$Build\$bin\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)Build\obj\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Build\bin\$(Configuration)\$(ProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IntDir>$Build\$obj\$(ProjectName)</IntDir>
-    <OutDir>$(SolutionDir)$Build\$bin\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)Build\obj\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Build\bin\$(Configuration)\$(ProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnableManifest>false</VcpkgEnableManifest>
@@ -121,7 +121,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(solutionDir)DirectX12EngineProject/src;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui/backends</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(solutionDir)Source/Engine;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui/backends</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
     </ClCompile>
@@ -138,7 +138,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(solutionDir)DirectX12EngineProject/src;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui/backends</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(solutionDir)Source/Engine;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui;$(solutionDir)DirectX12EngineProject/ThirdParty/imgui/backends</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -149,86 +149,24 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Core\DirectX12EngineProject.h" />
-    <ClInclude Include="Core\Resource.h" />
-    <ClInclude Include="Core\targetver.h" />
-    <ClInclude Include="D3D12\D3D12App.h" />
+    <ClInclude Include="Core\D3D12App.h" />
     <ClInclude Include="D3DX12\d3dx12.h" />
-    <ClInclude Include="Framework\AppFramework.h" />
-    <ClInclude Include="libs\assimp6_0_2\assimp\include\Importer.hpp" />
-    <ClInclude Include="libs\assimp6_0_2\assimp\include\scene.h" />
-    <ClInclude Include="Managers\ComponentManager.h" />
-    <ClInclude Include="Managers\EntityManager.h" />
+    <ClInclude Include="ECS\ComponentArray.h" />
+    <ClInclude Include="ECS\ComponentManager.h" />
+    <ClInclude Include="ECS\EntityManager.h" />
+    <ClInclude Include="ECS\Registry.h" />
     <ClInclude Include="Managers\ImGuiManager.h" />
-    <ClInclude Include="Managers\ModelManager.h" />
-    <ClInclude Include="src\Engine\Managers\ComponentManager.h" />
-    <ClInclude Include="src\Engine\Managers\EntityManager.h" />
-    <ClInclude Include="src\Game\ComponentArray.h" />
-    <ClInclude Include="src\Scene\EntityManager.h" />
-    <ClInclude Include="src\Game\Registry.h" />
-    <ClInclude Include="src\Game\Scene.h" />
-    <ClInclude Include="src\Engine\Managers\ModelManager.h" />
-    <ClInclude Include="src\Engine\D3DX12\d3dx12.h" />
-    <ClInclude Include="src\Engine\Utils\DescriptorHeapAllocator.h" />
-    <ClInclude Include="src\Engine\Managers\ImGuiManager.h" />
-    <ClInclude Include="src\Engine\Framework\AppFramework.h" />
-    <ClInclude Include="src\Engine\D3D12\D3D12App.h" />
-    <ClInclude Include="src\Engine\Core\DirectX12EngineProject.h" />
-    <ClInclude Include="src\Engine\Core\Resource.h" />
-    <ClInclude Include="src\Engine\Core\targetver.h" />
-    <ClInclude Include="src\Engine\Utils\Utils.h" />
-    <ClInclude Include="ThirdParty\imgui\backends\imgui_impl_dx12.h" />
-    <ClInclude Include="ThirdParty\imgui\backends\imgui_impl_win32.h" />
-    <ClInclude Include="ThirdParty\imgui\imgui.h" />
     <ClInclude Include="Utils\DescriptorHeapAllocator.h" />
+    <ClInclude Include="Utils\Timer.h" />
     <ClInclude Include="Utils\Utils.h" />
+    <ClInclude Include="Utils\Vertex.h" />
+    <ClInclude Include="Utils\Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Core\DirectX12EngineProject.cpp" />
-    <ClCompile Include="D3D12\D3D12App.cpp" />
-    <ClCompile Include="Framework\AppFramework.cpp" />
+    <ClCompile Include="Core\D3D12App.cpp" />
     <ClCompile Include="Managers\ImGuiManager.cpp" />
-    <ClCompile Include="Managers\ModelManager.cpp" />
-    <ClCompile Include="src\Game\Scene.cpp" />
-    <ClCompile Include="src\Engine\Managers\ModelManager.cpp" />
-    <ClCompile Include="src\Engine\Managers\ImGuiManager.cpp" />
-    <ClCompile Include="src\Engine\Framework\AppFramework.cpp" />
-    <ClCompile Include="src\Engine\D3D12\D3D12App.cpp" />
-    <ClCompile Include="src\Engine\Core\DirectX12EngineProject.cpp" />
-    <ClCompile Include="src\Engine\Utils\Utils.cpp" />
-    <ClCompile Include="ThirdParty\imgui\backends\imgui_impl_dx12.cpp" />
-    <ClCompile Include="ThirdParty\imgui\backends\imgui_impl_win32.cpp" />
-    <ClCompile Include="ThirdParty\imgui\imgui.cpp" />
-    <ClCompile Include="ThirdParty\imgui\imgui_draw.cpp" />
-    <ClCompile Include="ThirdParty\imgui\imgui_tables.cpp" />
-    <ClCompile Include="ThirdParty\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Utils\Utils.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Core\DirectX12EngineProject.rc" />
-    <ResourceCompile Include="src\Engine\Core\DirectX12EngineProject.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="src\Engine\Shaders\SimplePS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">PSMain</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">PSMain</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="src\Engine\Shaders\SimpleVS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VSMain</EntryPointName>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VSMain</EntryPointName>
-    </FxCompile>
+    <ClCompile Include="Utils\Window.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -66,7 +66,15 @@ void Debug::CreateConsole()
 }
 
 // 실행 파일(.exe)이 있는 디렉터리 경로를 반환하는 함수
-std::wstring GetExeDirectory()
+std::filesystem::path GetExeDirectory()
+{
+    wchar_t buffer[MAX_PATH];
+    GetModuleFileNameW(NULL, buffer, MAX_PATH);
+    return std::filesystem::path(buffer).parent_path();
+}
+
+// 실행 파일(.exe)이 있는 디렉터리 경로를 WString반환하는 함수
+std::wstring GetExeDirectoryWstring()
 {
     wchar_t buffer[MAX_PATH];
     GetModuleFileNameW(NULL, buffer, MAX_PATH);

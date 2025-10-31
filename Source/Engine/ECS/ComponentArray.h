@@ -6,6 +6,12 @@
 #include <cassert> // 우리는 '절대' 잘못된 접근을 하면 안 됩니다.
 #include <limits>   // 유효하지 않은 인덱스를 표기하기 위해
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX // Windows.h가 min/max 매크로를 정의하지 못하게 방지
+#include <Windows.h>
+#undef  min
+#undef  max
+
 // Entity는 단순한 32비트 ID입니다.
 using Entity = uint32_t;
 

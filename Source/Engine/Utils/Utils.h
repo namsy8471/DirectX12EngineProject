@@ -36,7 +36,8 @@ private:
 }
 
 // 실행 파일(.exe)이 있는 디렉터리 경로를 반환하는 함수
-std::wstring GetExeDirectory();
+std::filesystem::path GetExeDirectory();
+std::wstring GetExeDirectoryWstring();
 
 // wstring을 string으로 변환하는 함수
 std::string WstringToString(const std::wstring& wstr);

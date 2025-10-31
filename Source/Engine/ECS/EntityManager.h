@@ -1,7 +1,7 @@
 // Entity Manager.h
 #pragma once
 
-#include "./Scene/ComponentArray.h" // Entity 타입을 가져오기 위해
+#include "ComponentArray.h" // Entity 타입을 가져오기 위해
 #include <queue>              // 재활용할 ID를 저장하기 위한 큐
 #include <set>                // 현재 활성화된 Entity를 빠르게 추적
 

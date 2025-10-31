@@ -1,8 +1,8 @@
 // Registry.h (Facade)
 #pragma once
 
-#include "./Managers/EntityManager.h"
-#include "./Managers/ComponentManager.h"
+#include "EntityManager.h"
+#include "ComponentManager.h"
 
 class Registry
 {

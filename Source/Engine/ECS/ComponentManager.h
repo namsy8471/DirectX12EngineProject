@@ -1,7 +1,7 @@
 // ComponentManager.h
 #pragma once
 
-#include "./Scene/ComponentArray.h"
+#include "ComponentArray.h"
 #include <memory>
 #include <unordered_map>
 #include <typeindex>      // 템플릿 타입을 맵의 키로 사용하기 위해
