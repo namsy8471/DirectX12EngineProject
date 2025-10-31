@@ -191,9 +191,24 @@ D3D12App::D3D12App(HWND hWnd, UINT width, UINT height)
 	Debug::Print(L"Shader Bytecode Load Complete!");
 
 	// Create Root Signature
+	// Descriptor Range
+	D3D12_DESCRIPTOR_RANGE descriptorRange = {};
+	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV; // Constant Buffer View
+	descriptorRange.NumDescriptors = 1;
+	descriptorRange.BaseShaderRegister = 0; // b0
+	descriptorRange.RegisterSpace = 0;
+	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	// Root Parameter
+	D3D12_ROOT_PARAMETER rootParameter = {};
+	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameter.DescriptorTable.NumDescriptorRanges = 1;
+	rootParameter.DescriptorTable.pDescriptorRanges = &descriptorRange;
+	rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	rootSignatureDesc.NumParameters = 1;
-	rootSignatureDesc.pParameters = nullptr;
+	rootSignatureDesc.pParameters = &rootParameter;
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	ComPtr<ID3DBlob> signature;

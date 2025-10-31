@@ -7,7 +7,7 @@
 void ModelManager::LoadModel(const std::string& fileName, std::vector<Vertex>& outVertices,
     std::vector<uint32_t>& outIndices)
 {
-    std::filesystem::path filePath = std::filesystem::current_path() / "\\Assets\\Models\\" / fileName;
+    std::filesystem::path filePath = std::filesystem::current_path() / "Assets\\Models" / fileName;
 
     // Create an instance of the Importer class
     Assimp::Importer importer;
