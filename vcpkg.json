@@ -2,6 +2,14 @@
   "name": "directx12engineproject",
   "version-string": "0.1.0",
   "dependencies": [
-    "assimp"
+    "assimp",
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental",
+        "win32-binding",
+        "dx12-binding"
+      ]
+    }
   ]
 }

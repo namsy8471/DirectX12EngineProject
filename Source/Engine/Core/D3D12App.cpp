@@ -253,7 +253,7 @@ void D3D12App::Resize(UINT width, UINT height)
 		rtvHandle.ptr += m_rtvDescriptorSize;
 	}
 
-	// DSV 재생성 (버그 수정)
+	// DSV 재생성
 	D3D12_RESOURCE_DESC depthStencilDesc = {};
 	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	depthStencilDesc.Width = width;

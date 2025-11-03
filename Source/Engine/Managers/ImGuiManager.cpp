@@ -28,6 +28,8 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
 	
 	// 스타일 설정
 	ImGui::StyleColorsDark();
@@ -73,10 +75,38 @@ void ImGuiManager::NewFrame()
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+
 }
 
 void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 {
+	ImGuiID d = ImGui::GetID("MyWindow");
+
+	// Set ImGui Window Flags
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+	// Fullscreen ImGui Window
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->Pos);
+	ImGui::SetNextWindowSize(viewport->Size);
+	ImGui::SetNextWindowViewport(viewport->ID);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+	// Begin DockSpace
+	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+	ImGui::PopStyleVar(3);
+
+	ImGui::DockSpace(d, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+	ImGui::End();
+
+
+	// Render your ImGui elements here
+	// Sample ImGui Window
 	ImGui::Begin("Hello, ImGui!");
 	ImGui::Text("DirectX 12 + ImGui is Connected Successfully!");
 	ImGui::End();
@@ -87,4 +117,11 @@ void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 	cmdList->SetDescriptorHeaps(_countof(heaps), heaps);
 
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList);
+
+	ImGuiIO& io = ImGui::GetIO();
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		ImGui::UpdatePlatformWindows();
+		ImGui::RenderPlatformWindowsDefault(NULL, static_cast<void*>(cmdList));
+	}
 }
