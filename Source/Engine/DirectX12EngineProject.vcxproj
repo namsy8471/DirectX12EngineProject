@@ -155,6 +155,7 @@
     <ClInclude Include="ECS\ComponentManager.h" />
     <ClInclude Include="ECS\EntityManager.h" />
     <ClInclude Include="ECS\Registry.h" />
+    <ClInclude Include="Components\IComponent.h" />
     <ClInclude Include="Managers\ImGuiManager.h" />
     <ClInclude Include="Utils\DescriptorHeapAllocator.h" />
     <ClInclude Include="Utils\Timer.h" />
@@ -164,6 +165,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Core\D3D12App.cpp" />
+    <ClCompile Include="Components\IComponent.cpp" />
     <ClCompile Include="Managers\ImGuiManager.cpp" />
     <ClCompile Include="Utils\Utils.cpp" />
     <ClCompile Include="Utils\Window.cpp" />

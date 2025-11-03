@@ -11,16 +11,24 @@ ImGuiManager* ImGuiManager::s_instance = nullptr; // 싱글톤 초기화
 
 ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, HWND hWnd, const int FRAME_COUNT)
 {
-	UNREFERENCED_PARAMETER(cmdQueue);
-
 	ImGuiManager::s_instance = this;
 
 	// Create ImGui Descriptor Heap
 	D3D12_DESCRIPTOR_HEAP_DESC imguiHeapDesc = {};
-	imguiHeapDesc.NumDescriptors = 64;
+	imguiHeapDesc.NumDescriptors = m_totalHeapSize;
 	imguiHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	imguiHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	device->CreateDescriptorHeap(&imguiHeapDesc, IID_PPV_ARGS(&m_imguiDescHeap));
+
+	// Get SRV Descriptor Size
+	m_srvHandleIncrementSize = 
+		device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// 폰트 디스크립터 핸들
+	D3D12_CPU_DESCRIPTOR_HANDLE fontCpuHandle = 
+		m_imguiDescHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE fontGpuHandle = 
+		m_imguiDescHeap->GetGPUDescriptorHandleForHeapStart();
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -60,6 +68,11 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 		};
 
 	ImGui_ImplDX12_Init(&init_info);
+
+	// 초기 창 크기 설정
+	RECT rect;
+	GetClientRect(hWnd, &rect);
+	SendMessage(hWnd, WM_SIZE, SIZE_RESTORED, MAKELPARAM(rect.right - rect.left, rect.bottom - rect.top));
 }
 
 ImGuiManager::~ImGuiManager()
@@ -80,8 +93,6 @@ void ImGuiManager::NewFrame()
 
 void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 {
-	ImGuiID d = ImGui::GetID("MyWindow");
-
 	// Set ImGui Window Flags
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
@@ -99,16 +110,48 @@ void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 
 	// Begin DockSpace
 	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-	ImGui::PopStyleVar(3);
 
-	ImGui::DockSpace(d, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			ImGui::MenuItem("New Project");
+			ImGui::MenuItem("Save Project");
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Help"))
+		{
+			ImGui::MenuItem("About My Engine");
+			ImGui::EndMenu();
+		}
+		ImGui::EndMenuBar();
+	}
+
+	ImGuiID dockspace_id = ImGui::GetID("MyWindow");
+	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 	ImGui::End();
 
+	ImGui::PopStyleVar(3);
 
-	// Render your ImGui elements here
-	// Sample ImGui Window
-	ImGui::Begin("Hello, ImGui!");
-	ImGui::Text("DirectX 12 + ImGui is Connected Successfully!");
+
+	// Render your ImGui elements here	
+	ImGui::Begin("Inspector");
+	ImGui::End();
+
+	ImGui::Begin("Scene");
+	ImGui::End();
+
+	ImGui::Begin("Game");
+	ImGui::End();
+
+	ImGui::Begin("Hierarchy");
+	ImGui::End();
+	
+	// Project
+	ImGui::Begin("Project");
+	ImGui::End();
+
+	ImGui::Begin("Console");
 	ImGui::End();
 
 	ImGui::Render();
@@ -124,4 +167,33 @@ void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 		ImGui::UpdatePlatformWindows();
 		ImGui::RenderPlatformWindowsDefault(NULL, static_cast<void*>(cmdList));
 	}
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE ImGuiManager::RegisterTexture(ID3D12Device* pDevice, ID3D12Resource* pTextureResource)
+{
+	// Check if heap is full
+	if (m_currentHeapIndex >= m_totalHeapSize)
+	{
+		Debug::Print("ImGui Descriptor Heap is Full!");
+		throw std::runtime_error("ImGui Descriptor Heap is Full!");
+	}
+
+	// Create SRV for the texture
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_imguiDescHeap->GetCPUDescriptorHandleForHeapStart();
+	cpuHandle.ptr += m_srvHandleIncrementSize * m_currentHeapIndex;
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_imguiDescHeap->GetGPUDescriptorHandleForHeapStart();
+	gpuHandle.ptr += m_srvHandleIncrementSize * m_currentHeapIndex;
+
+	// Describe and create the SRV
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = pTextureResource->GetDesc().Format;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+
+	pDevice->CreateShaderResourceView(pTextureResource, &srvDesc, cpuHandle);
+
+	m_currentHeapIndex++;
+
+	return gpuHandle;
 }

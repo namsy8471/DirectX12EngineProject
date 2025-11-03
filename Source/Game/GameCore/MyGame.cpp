@@ -43,7 +43,6 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	descriptorRange.NumDescriptors = 1;
 	descriptorRange.BaseShaderRegister = 0; // b0
-	// ... (원본 코드와 동일)
 
 	D3D12_ROOT_PARAMETER rootParameter = {};
 	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -93,10 +92,10 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.SampleDesc.Count = 1;
 	
-	// DSV 포맷도 설정해야 합니다. (원본 코드 누락)
+	// DSV 포맷도 설정해야 합니다.
 	psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 	
-	// 깊이 테스트를 켜야 합니다. (원본 코드 누락)
+	// 깊이 테스트를 켜야 합니다.
 	psoDesc.DepthStencilState.DepthEnable = TRUE;
 	psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 	psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
@@ -149,6 +148,7 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 // '게임 로직' 업데이트. D3D12App::Run()의 메인 루프에서 매 프레임 호출됩니다.
 void MyGame::Update(float dt)
 {
+	UNREFERENCED_PARAMETER(dt);
 	// (예시)
 	// m_transformSystem.Update(m_registry, dt);
 	// m_camera.Update(dt);

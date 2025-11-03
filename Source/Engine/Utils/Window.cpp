@@ -1,7 +1,9 @@
 #include "Window.h"
+#include "imgui_impl_win32.h"
 
 #include "Core\D3D12App.h"
 #include "Utils\Timer.h"
+
 #include <stdexcept>
 
 Window::Window(HINSTANCE hInstance, const WCHAR* title, UINT width, UINT height)
@@ -60,7 +62,6 @@ BOOL Window::InitInstance(int nCmdShow)
     if (!m_hWnd)
     {
         throw std::runtime_error("Failed to initialize application instance.");
-        return FALSE;
     }
 
     ShowWindow(m_hWnd, nCmdShow);
@@ -111,17 +112,6 @@ LRESULT Window::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 {
     switch (message)
     {
-    case WM_COMMAND:
-    {
-        int wmId = LOWORD(wParam);
-        // 메뉴 선택을 구문 분석합니다:
-        switch (wmId)
-        {
-        default:
-            return DefWindowProc(hWnd, message, wParam, lParam);
-        }
-    }
-    break;
     case WM_SIZE:
     {
         if (m_d3dApp)
@@ -152,7 +142,9 @@ LRESULT Window::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
     return 0;
 }
 
-extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+// ImGui 윈도우 프로시저 핸들러 선언 (현재 imgui_impl_win32.h에 extern으로 선언되어 있음)
+// extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 
 LRESULT CALLBACK Window::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -180,26 +172,4 @@ LRESULT CALLBACK Window::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
     {
         return DefWindowProc(hWnd, message, wParam, lParam);
 	}
-}
-
-
-
-// 정보 대화 상자의 메시지 처리기입니다.
-INT_PTR CALLBACK Window::About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    UNREFERENCED_PARAMETER(lParam);
-    switch (message)
-    {
-    case WM_INITDIALOG:
-        return (INT_PTR)TRUE;
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-        {
-            EndDialog(hDlg, LOWORD(wParam));
-            return (INT_PTR)TRUE;
-        }
-        break;
-    }
-    return (INT_PTR)FALSE;
 }

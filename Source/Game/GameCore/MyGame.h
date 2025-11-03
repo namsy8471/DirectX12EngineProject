@@ -6,6 +6,7 @@
 // 게임 로직은 '엔진'이 아닌 '게임'에만 include 됩니다.
 #include "Managers/ModelManager.h"
 #include "ECS/Registry.h" // (ECS 사용 예시)
+#include "imgui.h" // ImGui::ImTextureID
 
 /*
  * MyGame은 D3D12App 프레임워크를 '구현'하는 구체적인(Concrete) 클래스입니다.
@@ -20,10 +21,10 @@ public:
 
 	virtual bool Init(HWND hWnd, UINT width, UINT height) override;
 	virtual void Update(float dt) override;
-	void DrawGame();
 	virtual void Shutdown() override;
 
 protected:
+	void DrawGame();
 	virtual void OnResize(UINT width, UINT height) override;
 
 private:
@@ -35,6 +36,29 @@ private:
 
 	// 리소스 관리자
 	ModelManager m_modelManager;
+
+	// Render To Texture용 리소스와 뷰 힙
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rttRtvHeap;	// 렌더 타겟 뷰 힙
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rttDsvHeap;  // 깊이 스텐실 뷰 힙
+
+	// Scene View RTT 리소스
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneTexture; // Scene 렌더 타겟 텍스처
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneDepthBuffer; // Scene 깊이 버퍼 텍스처
+	D3D12_CPU_DESCRIPTOR_HANDLE m_sceneRtvHandle; // RTT RTV 힙의 0번 슬롯
+	D3D12_CPU_DESCRIPTOR_HANDLE m_sceneDsvHandle; // RTT DSV 힙의 0번 슬롯
+	ImTextureID m_sceneImGuiHandle; // ImGui용 텍스처 핸들
+	//Camera m_sceneCamera;
+	ImVec2 m_sceneViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
+
+	// Game View RTT 리소스
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_gameTexture; // Scene 렌더 타겟 텍스처
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_gameDepthBuffer; // Scene 깊이 버퍼 텍스처
+	D3D12_CPU_DESCRIPTOR_HANDLE m_gameRtvHandle; // RTT RTV 힙의 0번 슬롯
+	D3D12_CPU_DESCRIPTOR_HANDLE m_gameDsvHandle; // RTT DSV 힙의 0번 슬롯
+	ImTextureID m_gameImGuiHandle; // ImGui용 텍스처 핸들
+	//Camera m_gameCamera;
+	ImVec2 m_gameViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
+
 
 	// 게임 리소스 (PSO, RootSig, Mesh 등)
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;

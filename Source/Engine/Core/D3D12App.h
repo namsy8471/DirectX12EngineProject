@@ -58,45 +58,44 @@ protected:
 	// 3. 창 크기 변경 시
 	virtual void OnResize(UINT width, UINT height) = 0;
 
-
 	// [엔진 유틸리티]
 	// 자식 클래스가 사용할 수 있도록 protected로 변경합니다.
 	void WaitForGPU();
 	void MoveToNextFrame();
 	void SetViewportAndScissorRect(UINT width, UINT height);
 
-	// ImGui는 디버그 툴이므로 '엔진'이 소유하는 것이 합리적입니다.
+	// ImGui는 '엔진'이 소유하는 것이 합리적입니다.
 	std::unique_ptr<class ImGuiManager> m_imguiManager;
 
-	// 모든 D3D 객체와 멤버 변수들은 자식 클래스(MyGame)가 
-	// 접근해야 하므로 'protected'로 변경합니다.
-protected:
 	HINSTANCE m_hInstance;
 	HWND m_hWnd;
 
+	// D3D12 핵심 객체들
 	Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
 	Microsoft::WRL::ComPtr<ID3D12Device> m_device;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_commandQueue;
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_commandAllocators[FRAME_COUNT];
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_commandList;
-
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> m_swapChain;
+
+	// 렌더 타겟(RTV) 관련
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_renderTargetBuffers[FRAME_COUNT];
+	UINT m_rtvDescriptorSize; // RTV 디스크립터 크기
 
+	// 깊이 버퍼(DSV) 관련
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_depthStencilBuffer;
 
-	// ImGui 힙은 엔진이 관리합니다.
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_imguiDescHeap;
-
-	UINT m_rtvDescriptorSize;
+	// 현재 프레임 인덱스
 	UINT m_frameIndex;
 
+	// GPU 동기화용 펜스
 	Microsoft::WRL::ComPtr<ID3D12Fence> m_fence;
 	UINT64 m_fenceValue = 0;
 	HANDLE m_fenceEvent = nullptr;
 
+	// 뷰포트와 시저 렉트
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
 

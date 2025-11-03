@@ -37,7 +37,6 @@ bool D3D12App::InitBase(HWND hWnd, UINT width, UINT height)
 	ComPtr<ID3D12Debug> debugController;
 	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
 	debugController->EnableDebugLayer();
-	// ... (GPUBasedValidation 등)
 #endif // DEBUG
 
 	// Create DXGI Factory
@@ -169,7 +168,6 @@ void D3D12App::Render()
 	// 자식 클래스(MyGame)가 PSO, RootSig, VB/IB를 설정하고
 	// DrawIndexedInstanced()를 호출하는 부분이 여기 들어옵니다.
 	DrawGame();
-
 
 	// 3. [엔진] ImGui 그리기
 	m_imguiManager->Render(m_commandList.Get());
