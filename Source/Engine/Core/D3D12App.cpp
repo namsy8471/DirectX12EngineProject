@@ -177,7 +177,8 @@ void D3D12App::Render()
 #if defined(_EDITOR_MODE)
 	// ImGui
 	m_imguiManager->NewFrame();
-	m_imguiManager->Render(m_commandList.Get());
+	m_imguiManager->Render(m_commandList.Get(), 
+		m_sceneViewportSize, m_gameViewportSize, m_editorCamera, m_gameCamera);
 #endif // _EDITOR_MODE
 
 	// 2. [게임] 그리기 (가상 함수 호출)
@@ -329,16 +330,6 @@ void D3D12App::CreateRttResources()
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_rttDsvHeap)));
 
-	// 힙 핸들 주소 계산
-	UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	UINT dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-
-	m_sceneRtvHandle = m_rttRtvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
-	m_sceneDsvHandle = m_rttDsvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
-	
-	m_gameRtvHandle.ptr += m_sceneRtvHandle.ptr += rtvDescriptorSize; // 1번 슬롯
-	m_gameDsvHandle.ptr += m_sceneDsvHandle.ptr += dsvDescriptorSize; // 1번 슬롯
-
 	// RTT 리소스의 기본 클리어 색상 설정
 	D3D12_CLEAR_VALUE rtvClearValue = {};
 	rtvClearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
@@ -352,14 +343,93 @@ void D3D12App::CreateRttResources()
 	dsvClearValue.DepthStencil.Depth = 1.0f;
 	dsvClearValue.DepthStencil.Stencil = 0;
 
+#if defined(_EDITOR_MODE)
+	// 힙 핸들 주소 계산
+	UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	UINT dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+	m_sceneRtvHandle = m_rttRtvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
+	m_sceneDsvHandle = m_rttDsvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
+	
+	m_gameRtvHandle.ptr += m_sceneRtvHandle.ptr += rtvDescriptorSize; // 1번 슬롯
+	m_gameDsvHandle.ptr += m_sceneDsvHandle.ptr += dsvDescriptorSize; // 1번 슬롯
+
 	// Scene View용 RTT 텍스처 생성
+	// D3D12_RESOURCE_DESC 설정
 	auto sceneTexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // 포맷
 		static_cast<UINT64>(m_sceneViewportSize.x), //(), // 임시 크기
 		static_cast<UINT>(m_sceneViewportSize.y),
 		1, 0, 1, 0,
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	);
 
-	//TODO
+	// CreateCommittedResource 호출
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&sceneTexDesc,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,	// ImGui가 읽을 수 있도록 초기 상태
+		&rtvClearValue,
+		IID_PPV_ARGS(&m_sceneTexture)
+	));
+
+	m_device->CreateRenderTargetView(m_sceneTexture.Get(), nullptr, m_sceneRtvHandle);
+
+	// Scene 깊이 버퍼 생성
+	auto sceneDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+		DXGI_FORMAT_D32_FLOAT,	// 깊이 포맷
+		static_cast<UINT64>(m_sceneViewportSize.x),
+		static_cast<UINT>(m_sceneViewportSize.y),
+		1, 0, 1, 0,
+		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL // 깊이 스텐실 허용
+	);
+
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&sceneDepthDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,	// 깊이 쓰기 상태로 시작
+		&dsvClearValue,
+		IID_PPV_ARGS(&m_sceneDepthBuffer)
+	));
+
+	m_device->CreateDepthStencilView(m_sceneDepthBuffer.Get(), nullptr, m_sceneDsvHandle);
+
+	// Game View용 RTT 텍스처 생성
+	auto gameTexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // 포맷
+		static_cast<UINT64>(m_gameViewportSize.x), // 임시 크기
+		static_cast<UINT>(m_gameViewportSize.y),
+		1, 0, 1, 0,
+		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
+	);
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&gameTexDesc,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,	// ImGui가 읽을 수 있도록 초기 상태
+		&rtvClearValue,
+		IID_PPV_ARGS(&m_gameTexture)
+	));
+	m_device->CreateRenderTargetView(m_gameTexture.Get(), nullptr, m_gameRtvHandle);
+	
+	// Game 깊이 버퍼 생성
+	auto gameDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+		DXGI_FORMAT_D32_FLOAT,	// 깊이 포맷
+		static_cast<UINT64>(m_gameViewportSize.x),
+		static_cast<UINT>(m_gameViewportSize.y),
+		1, 0, 1, 0,
+		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL // 깊이 스텐실 허용
+	);
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&gameDepthDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,	// 깊이 쓰기 상태로 시작
+		&dsvClearValue,
+		IID_PPV_ARGS(&m_gameDepthBuffer)
+	));
+	m_device->CreateDepthStencilView(m_gameDepthBuffer.Get(), nullptr, m_gameDsvHandle);
+#endif // _EDITOR_MODE
 }
