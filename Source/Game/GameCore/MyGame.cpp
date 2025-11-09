@@ -27,24 +27,6 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 
 	InitBase(hWnd, width, height); // 부모 클래스의 InitBase 호출
 
-	m_EditorCameraObject = std::make_unique<GameObject>("Editor Camera");
-	m_EditorCameraObject->GetTransform()->SetPosition(0.0f, 5.0f, -10.0f);
-	m_EditorCamera = m_EditorCameraObject->AddComponent<Camera>();
-
-	m_ActiveScene = std::make_unique<Scene>("Main Scene");
-	Debug::Print(L"Scene and Editor Camera Created!");
-
-	GameObject* gameCamObj = m_ActiveScene->CreateGameObject("Main Camera");
-	gameCamObj->GetTransform()->SetPosition(0.0f, 1.0f, -5.0f);
-	Camera* gameCam = gameCamObj->AddComponent<Camera>();
-
-	m_ActiveScene->SetMainCamera(gameCam);
-	Debug::Print(L"Main Camera Created in Scene!");
-
-	m_ActiveScene->CreateGameObject("Player");
-	m_ActiveScene->CreateGameObject("Ground");
-
-
 	// Load Shaders
 	auto dir = GetExeDirectoryWstring();
 	auto vsBytecode = ReadShaderBytecode(dir + L"\\SimpleVS.cso");
@@ -80,13 +62,13 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
 	ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-	ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_RootSignature)));
+	ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
 	Debug::Print(L"Root Signature Load Complete!");
 
 	// Create Pipeline State Object(PSO)
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-	psoDesc.pRootSignature = m_RootSignature.Get();
+	psoDesc.pRootSignature = m_rootSignature.Get();
 	psoDesc.VS = vertexShaderBytecode;
 	psoDesc.PS = pixelShaderBytecode;
 
@@ -123,46 +105,61 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
 
-	ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_Pso)));
+	ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pso)));
 	Debug::Print(L"Pipeline State Object Load Complete!");
 
 	// Load Model Data
-	m_ModelManager.LoadModel("Dragon 2.5_fbx.fbx", m_Vertices, m_Indices);
-	Debug::Print(L"Model Load Complete! Vertex Count: " + std::to_wstring(m_Vertices.size()) + L", Index Count: " + std::to_wstring(m_Indices.size()));
+	m_modelManager.LoadModel("Dragon 2.5_fbx.fbx", m_vertices, m_indices);
+	Debug::Print(L"Model Load Complete! Vertex Count: " + std::to_wstring(m_vertices.size()) + L", Index Count: " + std::to_wstring(m_indices.size()));
 
 	// Create Vertex Buffer
-	UINT vbSize = static_cast<UINT>(m_Vertices.size() * sizeof(Vertex));
+	UINT vbSize = static_cast<UINT>(m_vertices.size() * sizeof(Vertex));
 	CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
 	CD3DX12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vbSize);
 
 	ThrowIfFailed(m_device->CreateCommittedResource(
 		&heapProps, D3D12_HEAP_FLAG_NONE, &vbDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_VertexBuffer))
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_vertexBuffer))
 	);
 	void* vbData;
-	m_VertexBuffer->Map(0, nullptr, &vbData);
-	memcpy(vbData, m_Vertices.data(), vbSize);
-	m_VertexBuffer->Unmap(0, nullptr);
+	m_vertexBuffer->Map(0, nullptr, &vbData);
+	memcpy(vbData, m_vertices.data(), vbSize);
+	m_vertexBuffer->Unmap(0, nullptr);
 
-	m_VbView.BufferLocation = m_VertexBuffer->GetGPUVirtualAddress();
-	m_VbView.SizeInBytes = vbSize;
-	m_VbView.StrideInBytes = sizeof(Vertex);
+	m_vbView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vbView.SizeInBytes = vbSize;
+	m_vbView.StrideInBytes = sizeof(Vertex);
 
 	// Create Index Buffer
-	UINT ibSize = static_cast<UINT>(m_Indices.size() * sizeof(UINT));
+	UINT ibSize = static_cast<UINT>(m_indices.size() * sizeof(UINT));
 	CD3DX12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(ibSize);
 	ThrowIfFailed(m_device->CreateCommittedResource(
 		&heapProps, D3D12_HEAP_FLAG_NONE, &ibDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_IndexBuffer))
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_indexBuffer))
 	);
 	void* ibData;
-	m_IndexBuffer->Map(0, nullptr, &ibData);
-	memcpy(ibData, m_Indices.data(), ibSize);
-	m_IndexBuffer->Unmap(0, nullptr);
+	m_indexBuffer->Map(0, nullptr, &ibData);
+	memcpy(ibData, m_indices.data(), ibSize);
+	m_indexBuffer->Unmap(0, nullptr);
 
-	m_IbView.BufferLocation = m_IndexBuffer->GetGPUVirtualAddress();
-	m_IbView.SizeInBytes = ibSize;
-	m_IbView.Format = DXGI_FORMAT_R32_UINT;
+	m_ibView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_ibView.SizeInBytes = ibSize;
+	m_ibView.Format = DXGI_FORMAT_R32_UINT;
+
+	// Create Scene and Main Camera
+	m_activeScene = std::make_unique<Scene>("Main Scene");
+	Debug::Print(L"Scene and Editor Camera Created!");
+
+	GameObject* gameCamObj = m_activeScene->CreateGameObject("Main Camera");
+	gameCamObj->GetTransform()->SetPosition(0.0f, 1.0f, -5.0f);
+	Camera* gameCam = gameCamObj->AddComponent<Camera>();
+	gameCam->Init();
+
+	m_activeScene->SetMainCamera(gameCam);
+	Debug::Print(L"Main Camera Created in Scene!");
+
+	m_activeScene->CreateGameObject("Player");
+	m_activeScene->CreateGameObject("Ground");
 
 	return true; // 초기화 성공
 }
@@ -170,7 +167,7 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 // '게임 로직' 업데이트. D3D12App::Run()의 메인 루프에서 매 프레임 호출됩니다.
 void MyGame::Update(float deltaTime)
 {
-	m_ActiveScene->Update(deltaTime);
+	m_activeScene->Update(deltaTime);
 }
 
 // '그리기' 명령. D3D12App::Render() 내부에서 호출됩니다.
@@ -178,17 +175,17 @@ void MyGame::Update(float deltaTime)
 void MyGame::DrawGame()
 {
 	// [게임] PSO, RootSig 설정
-	m_commandList->SetGraphicsRootSignature(m_RootSignature.Get());
-	m_commandList->SetPipelineState(m_Pso.Get());
+	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	m_commandList->SetPipelineState(m_pso.Get());
 
 	// [게임] 리소스 바인딩 (ECS RenderSystem이 이 작업을 할 것입니다)
-	m_commandList->IASetVertexBuffers(0, 1, &m_VbView); // 정점 버퍼 설정
-	m_commandList->IASetIndexBuffer(&m_IbView); // 인덱스 버퍼 설정
+	m_commandList->IASetVertexBuffers(0, 1, &m_vbView); // 정점 버퍼 설정
+	m_commandList->IASetIndexBuffer(&m_ibView); // 인덱스 버퍼 설정
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// [게임] 그리기
 	m_commandList->DrawIndexedInstanced(
-		static_cast<UINT>(m_Indices.size()),
+		static_cast<UINT>(m_indices.size()),
 		1, 0, 0, 0
 	);
 }

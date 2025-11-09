@@ -1,6 +1,7 @@
 #include "ImGuiManager.h"
 
 #include "../Utils/Utils.h"
+#include "Components/Camera.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
@@ -91,7 +92,8 @@ void ImGuiManager::NewFrame()
 
 }
 
-void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
+void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList, 
+	ImVec2& sceneViewport, ImVec2& gameViewport, Camera* sceneCamera, Camera* gameCamera)
 {
 	// Set ImGui Window Flags
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
@@ -133,15 +135,52 @@ void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 
 	ImGui::PopStyleVar(3);
 
-
 	// Render your ImGui elements here	
 	ImGui::Begin("Inspector");
 	ImGui::End();
 
 	ImGui::Begin("Scene");
+	{
+		//Scene Viewport Rendering
+		ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+
+		if (viewportSize.x > 0 && viewportSize.y > 0)
+		{
+			// Store the viewport size for later use
+			sceneViewport = viewportSize;
+
+			if (sceneCamera)
+			{
+				sceneCamera->SetProjectionMatrix(
+					60.0f, 
+					sceneViewport.x / sceneViewport.y, 
+					0.1f, 
+					1000.0f);
+			}
+		}
+	}
 	ImGui::End();
 
 	ImGui::Begin("Game");
+	{
+		//Game Viewport Rendering
+		ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+
+		if (viewportSize.x > 0 && viewportSize.y > 0)
+		{
+			// Store the viewport size for later use
+			gameViewport = viewportSize;
+
+			if(gameCamera)
+			{
+				gameCamera->SetProjectionMatrix(
+					60.0f,
+					gameViewport.x / gameViewport.y,
+					0.1f,
+					1000.0f);
+			}
+		}
+	}
 	ImGui::End();
 
 	ImGui::Begin("Hierarchy");
@@ -167,6 +206,16 @@ void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 		ImGui::UpdatePlatformWindows();
 		ImGui::RenderPlatformWindowsDefault(NULL, static_cast<void*>(cmdList));
 	}
+}
+
+D3D12_VIEWPORT ImGuiManager::GetSceneViewportSize()
+{
+	return D3D12_VIEWPORT();
+}
+
+D3D12_VIEWPORT ImGuiManager::GetGameViewportSize()
+{
+	return D3D12_VIEWPORT();
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE ImGuiManager::RegisterTexture(ID3D12Device* pDevice, ID3D12Resource* pTextureResource)

@@ -12,6 +12,8 @@ public:
 	Camera(GameObject* owner);
 	virtual ~Camera() = default;
 
+	void Init() override;
+
 	XMMATRIX GetViewMatrix() const;
 	XMMATRIX GetProjectionMatrix() const;
 
@@ -19,12 +21,12 @@ public:
 
 private:
 
-	float m_FOV = 60.0f;
-	float m_AspectRatio = 16.0f / 9.0f;
-	float m_NearPlane = 0.1f;
-	float m_FarPlane = 1000.0f;
+	float m_fov = 60.0f;
+	float m_aspectRatio = 16.0f / 9.0f;
+	float m_nearPlane = 0.1f;
+	float m_farPlane = 1000.0f;
 
-	XMFLOAT4X4 m_ViewMatrix;
-	XMFLOAT4X4 m_ProjectionMatrix;
+	XMFLOAT4X4 m_viewMatrix;
+	XMFLOAT4X4 m_projectionMatrix;
 };
 

@@ -3,6 +3,8 @@
 #include "Utils/Timer.h"  // Timer 클래스
 #include "Managers/ImGuiManager.h" // ImGui
 #include "D3DX12/d3dx12.h"
+#include "Components/GameObject.h"
+#include "Components/Camera.h"
 
 // 생성자: 멤버 변수 초기화
 D3D12App::D3D12App(HINSTANCE hInstance)
@@ -32,7 +34,6 @@ bool D3D12App::InitBase(HWND hWnd, UINT width, UINT height)
 	m_hWnd = hWnd;
 	using namespace Microsoft::WRL;
 
-	// 원본 생성자의 모든 코드를 InitBase()로 이동
 #ifdef _DEBUG
 	ComPtr<ID3D12Debug> debugController;
 	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
@@ -120,9 +121,20 @@ bool D3D12App::InitBase(HWND hWnd, UINT width, UINT height)
 	));
 	m_commandList->Close(); // 즉시 닫습니다. Render()에서 Reset()할 것입니다.
 
-	// ImGui 초기화 (엔진이 담당)
+#if defined(_EDITOR_MODE)
+	// ImGui 초기화
 	m_imguiManager = std::make_unique<ImGuiManager>
 		(m_device.Get(), m_commandQueue.Get(), hWnd, FRAME_COUNT);
+
+	// 에디터 카메라 생성
+	m_editorCameraObject = std::make_unique<GameObject>("Editor Camera");
+	m_editorCameraObject->GetTransform()->SetPosition(0.0f, 5.0f, -10.0f);
+	m_editorCamera = m_editorCameraObject->AddComponent<Camera>();
+	m_editorCamera->Init();
+
+	
+
+#endif // _EDITOR_MODE
 
 	return true;
 }
@@ -162,15 +174,16 @@ void D3D12App::Render()
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+#if defined(_EDITOR_MODE)
+	// ImGui
 	m_imguiManager->NewFrame();
+	m_imguiManager->Render(m_commandList.Get());
+#endif // _EDITOR_MODE
 
 	// 2. [게임] 그리기 (가상 함수 호출)
 	// 자식 클래스(MyGame)가 PSO, RootSig, VB/IB를 설정하고
 	// DrawIndexedInstanced()를 호출하는 부분이 여기 들어옵니다.
 	DrawGame();
-
-	// 3. [엔진] ImGui 그리기
-	m_imguiManager->Render(m_commandList.Get());
 
 	// 4. [엔진] 프레임 제출
 	// 리소스 상태 전환 (Render Target -> Present)
@@ -299,4 +312,54 @@ void D3D12App::SetViewportAndScissorRect(UINT width, UINT height)
 	m_scissorRect.top = 0;
 	m_scissorRect.right = width;
 	m_scissorRect.bottom = height;
+}
+
+void D3D12App::CreateRttResources()
+{
+	// Render To Texture용 뷰 힙 생성
+	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+	rtvHeapDesc.NumDescriptors = 2; // Scene View용 1개 + Game View 1개
+	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rttRtvHeap)));
+
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+	dsvHeapDesc.NumDescriptors = 2; // Scene View용 1개 + Game View 1개
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_rttDsvHeap)));
+
+	// 힙 핸들 주소 계산
+	UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	UINT dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+	m_sceneRtvHandle = m_rttRtvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
+	m_sceneDsvHandle = m_rttDsvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
+	
+	m_gameRtvHandle.ptr += m_sceneRtvHandle.ptr += rtvDescriptorSize; // 1번 슬롯
+	m_gameDsvHandle.ptr += m_sceneDsvHandle.ptr += dsvDescriptorSize; // 1번 슬롯
+
+	// RTT 리소스의 기본 클리어 색상 설정
+	D3D12_CLEAR_VALUE rtvClearValue = {};
+	rtvClearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	rtvClearValue.Color[0] = 0.1f;
+	rtvClearValue.Color[1] = 0.1f;
+	rtvClearValue.Color[2] = 0.3f;
+	rtvClearValue.Color[3] = 1.0f;
+
+	D3D12_CLEAR_VALUE dsvClearValue = {};
+	dsvClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+	dsvClearValue.DepthStencil.Depth = 1.0f;
+	dsvClearValue.DepthStencil.Stencil = 0;
+
+	// Scene View용 RTT 텍스처 생성
+	auto sceneTexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		static_cast<UINT64>(m_sceneViewportSize.x), //(), // 임시 크기
+		static_cast<UINT>(m_sceneViewportSize.y),
+		1, 0, 1, 0,
+		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
+	);
+
+	//TODO
 }

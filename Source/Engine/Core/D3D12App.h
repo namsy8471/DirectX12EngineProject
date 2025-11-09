@@ -4,6 +4,7 @@
 #include <wrl.h>
 #include <memory>
 #include <vector>
+#include "imgui.h" // ImGui::ImTextureID
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -14,6 +15,9 @@
 #pragma comment(lib, "d3dcompiler.lib")
 
 constexpr UINT FRAME_COUNT = 2; // Double buffering
+
+class GameObject;
+class Camera;
 
 // D3D12App은 이제 '엔진 프레임워크'의 추상 기반 클래스입니다.
 // 이 클래스는 D3D12의 핵심 객체들(Device, Queue, SwapChain)을
@@ -64,8 +68,9 @@ protected:
 	void MoveToNextFrame();
 	void SetViewportAndScissorRect(UINT width, UINT height);
 
-	// ImGui는 '엔진'이 소유하는 것이 합리적입니다.
-	std::unique_ptr<class ImGuiManager> m_imguiManager;
+	// RTT(Render To Texture) 관련 함수
+	void CreateRttResources();
+	void Render3DScene(const Camera& camera);
 
 	HINSTANCE m_hInstance;
 	HWND m_hWnd;
@@ -101,4 +106,37 @@ protected:
 
 	// 게임 루프를 위한 타이머 추가
 	std::unique_ptr<class Timer> m_pTimer;
+
+	// Editor 전용 멤버들
+#if defined(_EDITOR_MODE)
+
+	// ImGui
+	std::unique_ptr<class ImGuiManager> m_imguiManager;
+
+	// Editor Camera
+	std::unique_ptr<GameObject> m_editorCameraObject;
+	Camera* m_editorCamera = nullptr;
+
+	// Render To Texture용 리소스와 뷰 힙
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rttRtvHeap;	// 렌더 타겟 뷰 힙
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rttDsvHeap;  // 깊이 스텐실 뷰 힙
+
+	// Scene View RTT 리소스
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneTexture; // Scene 렌더 타겟 텍스처
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneDepthBuffer; // Scene 깊이 버퍼 텍스처
+	D3D12_CPU_DESCRIPTOR_HANDLE m_sceneRtvHandle; // RTT RTV 힙의 0번 슬롯
+	D3D12_CPU_DESCRIPTOR_HANDLE m_sceneDsvHandle; // RTT DSV 힙의 0번 슬롯
+	ImTextureID m_sceneViewImGuiHandle = 0; // ImGui용 텍스처 핸들
+	ImVec2 m_sceneViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
+
+	// Game View RTT 리소스
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_gameTexture; // Scene 렌더 타겟 텍스처
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_gameDepthBuffer; // Scene 깊이 버퍼 텍스처
+	D3D12_CPU_DESCRIPTOR_HANDLE m_gameRtvHandle; // RTT RTV 힙의 1번 슬롯
+	D3D12_CPU_DESCRIPTOR_HANDLE m_gameDsvHandle; // RTT DSV 힙의 1번 슬롯
+	ImTextureID m_gameViewImGuiHandle = 0; // ImGui용 텍스처 핸들
+	Camera* m_gameCamera;	// Game View에 사용할 카메라 (게임이 할당해줘야 함)
+	ImVec2 m_gameViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
+#endif // _EDITOR_MODE
+
 };

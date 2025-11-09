@@ -10,7 +10,10 @@ public:
 	ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, HWND hWnd, const int FRAME_COUNT);
 	~ImGuiManager();
 	void NewFrame();
-	void Render(ID3D12GraphicsCommandList* cmdList);
+	void Render(ID3D12GraphicsCommandList* cmdList, ImVec2& sceneViewport, ImVec2& gameViewport, Camera* sceneCamera, Camera* gameCamera);
+
+	D3D12_VIEWPORT GetSceneViewportSize();
+	D3D12_VIEWPORT GetGameViewportSize();
 
 private:
 
