@@ -6,6 +6,8 @@
 #include "Components/GameObject.h"
 #include "Components/Camera.h"
 
+constexpr float CLEAR_COLOR[] = { 0.0f, 0.2f, 0.4f, 1.0f }; // Clear Color RGBA
+
 // 생성자: 멤버 변수 초기화
 D3D12App::D3D12App(HINSTANCE hInstance)
 	: m_hInstance(hInstance),
@@ -132,63 +134,274 @@ bool D3D12App::InitBase(HWND hWnd, UINT width, UINT height)
 	m_editorCamera = m_editorCameraObject->AddComponent<Camera>();
 	m_editorCamera->Init();
 
-	
+	CreateRttResources();
+
+	m_editorViewImGuiHandle = m_imguiManager->RegisterTexture(m_editorTexture.Get());
+	m_gameViewImGuiHandle = m_imguiManager->RegisterTexture(m_gameTexture.Get());
 
 #endif // _EDITOR_MODE
 
 	return true;
 }
 
-// Render()는 이제 '템플릿 메서드'입니다.
-// 1. 프레임 준비 (엔진)
-// 2. 게임 그리기 (자식 클래스 가상 함수 호출)
-// 3. ImGui 그리기 (엔진)
-// 4. 프레임 제출 (엔진)
 void D3D12App::Render()
 {
 	// 1. [엔진] 프레임 준비
 	ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
 	ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
 
-	// 뷰포트와 시저렉트 설정
-	m_commandList->RSSetViewports(1, &m_viewport);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
-	// 리소스 상태 전환 (Present -> Render Target)
-	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+	auto barrierToRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(
 		m_renderTargetBuffers[m_frameIndex].Get(),
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
-	m_commandList->ResourceBarrier(1, &barrier);
 
-	// Render Target 설정
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-	rtvHandle.ptr += m_frameIndex * m_rtvDescriptorSize;
-
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
-	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	m_commandList->ResourceBarrier(1, &barrierToRenderTarget);
 
 #if defined(_EDITOR_MODE)
 	// ImGui
 	m_imguiManager->NewFrame();
-	m_imguiManager->Render(m_commandList.Get(), 
-		m_sceneViewportSize, m_gameViewportSize, m_editorCamera, m_gameCamera);
+
+	// Set ImGui Window Flags
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+	// Fullscreen ImGui Window
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->Pos);
+	ImGui::SetNextWindowSize(viewport->Size);
+	ImGui::SetNextWindowViewport(viewport->ID);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+	// Begin DockSpace
+	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			ImGui::MenuItem("New Project");
+			ImGui::MenuItem("Save Project");
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Help"))
+		{
+			ImGui::MenuItem("About My Engine");
+			ImGui::EndMenu();
+		}
+		ImGui::EndMenuBar();
+	}
+
+	ImGuiID dockspace_id = ImGui::GetID("MyWindow");
+	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+	ImGui::End();
+
+	ImGui::PopStyleVar(3);
+
+	// Render your ImGui elements here	
+	ImGui::Begin("Inspector");
+	ImGui::End();
+
+	ImGui::Begin("Scene");
+	{
+		//Scene Viewport Rendering
+		ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+
+		if (viewportSize.x > 0 && viewportSize.y > 0)
+		{
+			// Store the viewport size for later use
+			m_editorViewportSize = viewportSize;
+
+			if (m_editorCamera)
+			{
+				m_editorCamera->SetProjectionMatrix(
+					60.0f,
+					m_editorViewportSize.x / m_editorViewportSize.y,
+					0.1f,
+					1000.0f);
+			}
+		}
+	}
+	ImGui::End();
+
+	ImGui::Begin("Game");
+	{
+		//Game Viewport Rendering
+		ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+
+		if (viewportSize.x > 0 && viewportSize.y > 0)
+		{
+			// Store the viewport size for later use
+			m_gameViewportSize = viewportSize;
+
+			if (m_gameCamera)
+			{
+				m_gameCamera->SetProjectionMatrix(
+					60.0f,
+					m_gameViewportSize.x / m_gameViewportSize.y,
+					0.1f,
+					1000.0f);
+			}
+		}
+	}
+	ImGui::End();
+
+	ImGui::Begin("Hierarchy");
+	ImGui::End();
+
+	// Project
+	ImGui::Begin("Project");
+	ImGui::End();
+
+	ImGui::Begin("Console");
+	ImGui::End();
+
+	if (m_editorCamera)
+	{
+		D3D12_RESOURCE_BARRIER barrierToRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_editorTexture.Get(),
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+		m_commandList->ResourceBarrier(1, &barrierToRenderTarget);
+
+		m_commandList->OMSetRenderTargets(1,
+			&m_editorRtvHandle,
+			FALSE,
+			&m_editorDsvHandle);
+
+		D3D12_VIEWPORT editorViewport = {0, 0,
+			m_editorViewportSize.x,
+			m_editorViewportSize.y,
+			0.0f, 1.0f };
+
+		D3D12_RECT editorScissor = {0, 0,
+			static_cast<LONG>(m_editorViewportSize.x),
+			static_cast<LONG>(m_editorViewportSize.y)};
+
+		m_commandList->RSSetViewports(1, &editorViewport);
+		m_commandList->RSSetScissorRects(1, &editorScissor);
+
+		m_commandList->ClearRenderTargetView(
+			m_editorRtvHandle,
+			CLEAR_COLOR,
+			0, nullptr);
+
+		m_commandList->ClearDepthStencilView(
+			m_editorDsvHandle,
+			D3D12_CLEAR_FLAG_DEPTH,
+			1.0f, 0,
+			0, nullptr);
+
+		Render3DScene(*m_editorCamera);
+
+		D3D12_RESOURCE_BARRIER barrierToShaderResource = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_editorTexture.Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_commandList->ResourceBarrier(1, &barrierToShaderResource);
+	}
+
+	if (m_gameCamera)
+	{
+		D3D12_RESOURCE_BARRIER barrierToRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_gameTexture.Get(),
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+		m_commandList->ResourceBarrier(1, &barrierToRenderTarget);
+		
+		m_commandList->OMSetRenderTargets(1,
+			&m_gameRtvHandle,
+			FALSE,
+			&m_gameDsvHandle);
+		
+		D3D12_VIEWPORT gameViewport = { 0, 0,
+			m_gameViewportSize.x,
+			m_gameViewportSize.y,
+			0.0f, 1.0f };
+		
+		D3D12_RECT gameScissor = { 0, 0,
+			static_cast<LONG>(m_gameViewportSize.x),
+			static_cast<LONG>(m_gameViewportSize.y) };
+		
+		m_commandList->RSSetViewports(1, &gameViewport);
+		m_commandList->RSSetScissorRects(1, &gameScissor);
+		
+		m_commandList->ClearRenderTargetView(
+			m_gameRtvHandle,
+			CLEAR_COLOR,
+			0, nullptr);
+		
+		m_commandList->ClearDepthStencilView(
+			m_gameDsvHandle,
+			D3D12_CLEAR_FLAG_DEPTH,
+			1.0f, 0,
+			0, nullptr);
+		
+		Render3DScene(*m_gameCamera);
+
+		D3D12_RESOURCE_BARRIER barrierToShaderResource = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_gameTexture.Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_commandList->ResourceBarrier(1, &barrierToShaderResource);
+	}
+
+	{
+		auto rtvHandle = GetCurrentBackBufferRtv();
+		auto dsvHandle = GetCurrentDsv();
+		m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+		// Set viewport and scissor rect
+		m_commandList->RSSetViewports(1, &m_viewport);
+		m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+		// Clear the render target and depth stencil
+		m_commandList->ClearRenderTargetView(rtvHandle, CLEAR_COLOR, 0, nullptr);
+		m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+		ImGui::Begin("Scene");
+		ImGui::Image(m_editorViewImGuiHandle, m_editorViewportSize);
+		ImGui::End();
+		ImGui::Begin("Game");
+		ImGui::Image(m_gameViewImGuiHandle, m_gameViewportSize);
+		ImGui::End();
+
+		// Render the ImGui Scene Viewport
+		m_imguiManager->Render(m_commandList.Get());
+	}
+
+#else
+
+	auto rtvHandle = GetCurrentBackBufferRtv();
+	auto dsvHandle = GetCurrentDsv();
+
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	m_commandList->RSSetViewports(1, &m_viewport);
+	m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+	// Clear the render target and depth stencil
+	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	if (m_gameCamera)
+	{
+		Render3DScene(*m_gameCamera);
+	}
+
 #endif // _EDITOR_MODE
 
-	// 2. [게임] 그리기 (가상 함수 호출)
-	// 자식 클래스(MyGame)가 PSO, RootSig, VB/IB를 설정하고
-	// DrawIndexedInstanced()를 호출하는 부분이 여기 들어옵니다.
-	DrawGame();
-
-	// 4. [엔진] 프레임 제출
+	// 프레임 제출
 	// 리소스 상태 전환 (Render Target -> Present)
-	barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 		m_renderTargetBuffers[m_frameIndex].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT
@@ -206,27 +419,25 @@ void D3D12App::Render()
 
 void D3D12App::MoveToNextFrame()
 {
-	const UINT64 currentFenceValue = m_fenceValue; // 다음 값
-	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
+	const UINT64 fence = ++m_fenceValue; // 다음 값
+	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	if (m_fence->GetCompletedValue() < m_fenceValue)
+	if (m_fence->GetCompletedValue() < fence)
 	{
-		ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
+		ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
 		WaitForSingleObject(m_fenceEvent, INFINITE);
 	}
-
-	m_fenceValue++;
 }
 
 // GPU가 모든 명령을 처리할 때까지 기다린다
 void D3D12App::WaitForGPU()
 {
-	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValue));
-	ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
+	const UINT64 fence = ++m_fenceValue;
+	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
+	ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
 	WaitForSingleObject(m_fenceEvent, INFINITE);
-	m_fenceValue++;
 }
 
 // Resize 함수를 수정하여 '깊이 버퍼(DSV)'도 재생성하도록 버그를 수정합니다.
@@ -258,10 +469,18 @@ void D3D12App::Resize(UINT width, UINT height)
 
 	// RTV 재생성
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+
+	// RTV 생성 설명자 설정 (ImGUI용 SRGB)
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+	rtvDesc.Texture2D.MipSlice = 0;
+	rtvDesc.Texture2D.PlaneSlice = 0;
+
 	for (UINT n = 0; n < FRAME_COUNT; n++)
 	{
 		m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargetBuffers[n]));
-		m_device->CreateRenderTargetView(m_renderTargetBuffers[n].Get(), nullptr, rtvHandle);
+		m_device->CreateRenderTargetView(m_renderTargetBuffers[n].Get(), &rtvDesc, rtvHandle);
 		rtvHandle.ptr += m_rtvDescriptorSize;
 	}
 
@@ -317,6 +536,7 @@ void D3D12App::SetViewportAndScissorRect(UINT width, UINT height)
 
 void D3D12App::CreateRttResources()
 {
+#if defined(_EDITOR_MODE)
 	// Render To Texture용 뷰 힙 생성
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
 	rtvHeapDesc.NumDescriptors = 2; // Scene View용 1개 + Game View 1개
@@ -333,68 +553,69 @@ void D3D12App::CreateRttResources()
 	// RTT 리소스의 기본 클리어 색상 설정
 	D3D12_CLEAR_VALUE rtvClearValue = {};
 	rtvClearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	rtvClearValue.Color[0] = 0.1f;
-	rtvClearValue.Color[1] = 0.1f;
-	rtvClearValue.Color[2] = 0.3f;
-	rtvClearValue.Color[3] = 1.0f;
+	std::copy(std::begin(CLEAR_COLOR), std::end(CLEAR_COLOR), rtvClearValue.Color); // RGBA 복사
 
 	D3D12_CLEAR_VALUE dsvClearValue = {};
 	dsvClearValue.Format = DXGI_FORMAT_D32_FLOAT;
 	dsvClearValue.DepthStencil.Depth = 1.0f;
 	dsvClearValue.DepthStencil.Stencil = 0;
 
-#if defined(_EDITOR_MODE)
 	// 힙 핸들 주소 계산
 	UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	UINT dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
-	m_sceneRtvHandle = m_rttRtvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
-	m_sceneDsvHandle = m_rttDsvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
+	m_editorRtvHandle = m_rttRtvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
+	m_editorDsvHandle = m_rttDsvHeap->GetCPUDescriptorHandleForHeapStart(); // 0번 슬롯
 	
-	m_gameRtvHandle.ptr += m_sceneRtvHandle.ptr += rtvDescriptorSize; // 1번 슬롯
-	m_gameDsvHandle.ptr += m_sceneDsvHandle.ptr += dsvDescriptorSize; // 1번 슬롯
+	m_gameRtvHandle = m_editorRtvHandle; // 0번 복사
+	m_gameRtvHandle.ptr += rtvDescriptorSize; // 1칸 이동
+
+	m_gameDsvHandle = m_editorDsvHandle; // 0번 복사
+	m_gameDsvHandle.ptr += dsvDescriptorSize; // 1칸 이동
 
 	// Scene View용 RTT 텍스처 생성
 	// D3D12_RESOURCE_DESC 설정
 	auto sceneTexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // 포맷
-		static_cast<UINT64>(m_sceneViewportSize.x), //(), // 임시 크기
-		static_cast<UINT>(m_sceneViewportSize.y),
+		static_cast<UINT64>(m_editorViewportSize.x), //(), // 임시 크기
+		static_cast<UINT>(m_editorViewportSize.y),
 		1, 0, 1, 0,
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	);
 
 	// CreateCommittedResource 호출
+	auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	
 	ThrowIfFailed(m_device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heapProps,
 		D3D12_HEAP_FLAG_NONE,
 		&sceneTexDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,	// ImGui가 읽을 수 있도록 초기 상태
 		&rtvClearValue,
-		IID_PPV_ARGS(&m_sceneTexture)
+		IID_PPV_ARGS(&m_editorTexture)
 	));
 
-	m_device->CreateRenderTargetView(m_sceneTexture.Get(), nullptr, m_sceneRtvHandle);
+	m_device->CreateRenderTargetView(m_editorTexture.Get(), nullptr, m_editorRtvHandle);
 
 	// Scene 깊이 버퍼 생성
 	auto sceneDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_D32_FLOAT,	// 깊이 포맷
-		static_cast<UINT64>(m_sceneViewportSize.x),
-		static_cast<UINT>(m_sceneViewportSize.y),
+		static_cast<UINT64>(m_editorViewportSize.x),
+		static_cast<UINT>(m_editorViewportSize.y),
 		1, 0, 1, 0,
 		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL // 깊이 스텐실 허용
 	);
 
 	ThrowIfFailed(m_device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heapProps,
 		D3D12_HEAP_FLAG_NONE,
 		&sceneDepthDesc,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,	// 깊이 쓰기 상태로 시작
 		&dsvClearValue,
-		IID_PPV_ARGS(&m_sceneDepthBuffer)
+		IID_PPV_ARGS(&m_editorDepthBuffer)
 	));
 
-	m_device->CreateDepthStencilView(m_sceneDepthBuffer.Get(), nullptr, m_sceneDsvHandle);
+	m_device->CreateDepthStencilView(m_editorDepthBuffer.Get(), nullptr, m_editorDsvHandle);
 
 	// Game View용 RTT 텍스처 생성
 	auto gameTexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
@@ -405,7 +626,7 @@ void D3D12App::CreateRttResources()
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	);
 	ThrowIfFailed(m_device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heapProps,
 		D3D12_HEAP_FLAG_NONE,
 		&gameTexDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,	// ImGui가 읽을 수 있도록 초기 상태
@@ -422,8 +643,10 @@ void D3D12App::CreateRttResources()
 		1, 0, 1, 0,
 		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL // 깊이 스텐실 허용
 	);
+
+	// CreateCommittedResource 호출
 	ThrowIfFailed(m_device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heapProps,
 		D3D12_HEAP_FLAG_NONE,
 		&gameDepthDesc,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,	// 깊이 쓰기 상태로 시작
@@ -432,4 +655,21 @@ void D3D12App::CreateRttResources()
 	));
 	m_device->CreateDepthStencilView(m_gameDepthBuffer.Get(), nullptr, m_gameDsvHandle);
 #endif // _EDITOR_MODE
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12App::GetCurrentBackBufferRtv() const
+{
+	// 현재 프레임의 RTV 핸들 반환
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+	
+	// Offset by frame index
+	rtvHandle.Offset(m_frameIndex, m_rtvDescriptorSize);
+	
+	// Return the handle
+	return rtvHandle;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12App::GetCurrentDsv() const
+{
+	return m_dsvHeap->GetCPUDescriptorHandleForHeapStart(); // DSV 힙에는 하나의 DSV만 존재
 }

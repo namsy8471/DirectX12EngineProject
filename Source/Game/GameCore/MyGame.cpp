@@ -92,7 +92,12 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	psoDesc.NumRenderTargets = 1;
 	// m_renderTargetBuffers는 부모 클래스(D3D12App)에
 	// 'protected'로 선언되어 있으므로 자식 클래스에서 접근 가능합니다.
-	psoDesc.RTVFormats[0] = m_renderTargetBuffers[0]->GetDesc().Format;
+#if defined(_EDITOR_MODE)
+	//psoDesc.RTVFormats[0] = m_renderTargetBuffers[0]->GetDesc().Format;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+#else
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+#endif
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.SampleDesc.Count = 1;
 	
@@ -150,16 +155,19 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	m_activeScene = std::make_unique<Scene>("Main Scene");
 	Debug::Print(L"Scene and Editor Camera Created!");
 
-	GameObject* gameCamObj = m_activeScene->CreateGameObject("Main Camera");
-	gameCamObj->GetTransform()->SetPosition(0.0f, 1.0f, -5.0f);
-	Camera* gameCam = gameCamObj->AddComponent<Camera>();
-	gameCam->Init();
+	if(m_activeScene)
+	{
+		GameObject* gameCamObj = m_activeScene->CreateGameObject("Main Camera");
+		gameCamObj->GetTransform()->SetPosition(0.0f, 1.0f, -5.0f);
+		Camera* gameCam = gameCamObj->AddComponent<Camera>();
+		gameCam->Init();
 
-	m_activeScene->SetMainCamera(gameCam);
-	Debug::Print(L"Main Camera Created in Scene!");
+		m_activeScene->SetMainCamera(gameCam);
+		Debug::Print(L"Main Camera Created in Scene!");
 
-	m_activeScene->CreateGameObject("Player");
-	m_activeScene->CreateGameObject("Ground");
+		m_activeScene->CreateGameObject("Player");
+		m_activeScene->CreateGameObject("Ground");
+	}
 
 	return true; // 초기화 성공
 }
@@ -172,11 +180,15 @@ void MyGame::Update(float deltaTime)
 
 // '그리기' 명령. D3D12App::Render() 내부에서 호출됩니다.
 // 엔진이 RTV/DSV 설정, 뷰포트/시저 설정을 '끝낸 후' 호출됩니다.
-void MyGame::DrawGame()
+void MyGame::Render3DScene(const Camera& camera)
 {
 	// [게임] PSO, RootSig 설정
 	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 	m_commandList->SetPipelineState(m_pso.Get());
+
+	XMMATRIX viewMatrix = camera.GetViewMatrix();
+	XMMATRIX projMatrix = camera.GetProjectionMatrix();
+	XMMATRIX wvp = XMMatrixIdentity() * viewMatrix * projMatrix;
 
 	// [게임] 리소스 바인딩 (ECS RenderSystem이 이 작업을 할 것입니다)
 	m_commandList->IASetVertexBuffers(0, 1, &m_vbView); // 정점 버퍼 설정

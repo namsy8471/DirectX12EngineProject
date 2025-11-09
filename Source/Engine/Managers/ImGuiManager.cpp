@@ -13,6 +13,7 @@ ImGuiManager* ImGuiManager::s_instance = nullptr; // 싱글톤 초기화
 ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, HWND hWnd, const int FRAME_COUNT)
 {
 	ImGuiManager::s_instance = this;
+	m_device = device;
 
 	// Create ImGui Descriptor Heap
 	D3D12_DESCRIPTOR_HEAP_DESC imguiHeapDesc = {};
@@ -46,7 +47,7 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 	// 백엔드 초기화
 	ImGui_ImplWin32_Init(hWnd);
 
-	m_ImGuiDescHeapAlloc.Create(device, m_imguiDescHeap.Get());
+	m_imGuiDescHeapAlloc.Create(device, m_imguiDescHeap.Get());
 
 	// 기존의 ImGui 초기화 방식 (더 이상 사용하지 않음)
 	/*ImGui_ImplDX12_Init(device, FRAME_COUNT, DXGI_FORMAT_R8G8B8A8_UNORM, m_imguiDescHeap.Get(),
@@ -57,15 +58,15 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 	init_info.Device = device;
 	init_info.CommandQueue = cmdQueue;
 	init_info.NumFramesInFlight = FRAME_COUNT;
-	init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+	init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	init_info.SrvDescriptorHeap = m_imguiDescHeap.Get();
 	init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* cpu, D3D12_GPU_DESCRIPTOR_HANDLE* gpu)
 		{
-			ImGuiManager::s_instance->m_ImGuiDescHeapAlloc.Alloc(cpu, gpu);
+			ImGuiManager::s_instance->m_imGuiDescHeapAlloc.Alloc(cpu, gpu);
 		};
 	init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu, D3D12_GPU_DESCRIPTOR_HANDLE gpu)
 		{
-			ImGuiManager::s_instance->m_ImGuiDescHeapAlloc.Free(cpu, gpu);
+			ImGuiManager::s_instance->m_imGuiDescHeapAlloc.Free(cpu, gpu);
 		};
 
 	ImGui_ImplDX12_Init(&init_info);
@@ -79,7 +80,7 @@ ImGuiManager::ImGuiManager(ID3D12Device* device, ID3D12CommandQueue* cmdQueue, H
 ImGuiManager::~ImGuiManager()
 {
 	ImGui_ImplDX12_Shutdown();
-	m_ImGuiDescHeapAlloc.Destroy();
+	m_imGuiDescHeapAlloc.Destroy();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 }
@@ -92,107 +93,8 @@ void ImGuiManager::NewFrame()
 
 }
 
-void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList, 
-	ImVec2& sceneViewport, ImVec2& gameViewport, Camera* sceneCamera, Camera* gameCamera)
+void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList)
 {
-	// Set ImGui Window Flags
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-
-	// Fullscreen ImGui Window
-	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos);
-	ImGui::SetNextWindowSize(viewport->Size);
-	ImGui::SetNextWindowViewport(viewport->ID);
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-
-	// Begin DockSpace
-	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-
-	if (ImGui::BeginMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			ImGui::MenuItem("New Project");
-			ImGui::MenuItem("Save Project");
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Help"))
-		{
-			ImGui::MenuItem("About My Engine");
-			ImGui::EndMenu();
-		}
-		ImGui::EndMenuBar();
-	}
-
-	ImGuiID dockspace_id = ImGui::GetID("MyWindow");
-	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
-	ImGui::End();
-
-	ImGui::PopStyleVar(3);
-
-	// Render your ImGui elements here	
-	ImGui::Begin("Inspector");
-	ImGui::End();
-
-	ImGui::Begin("Scene");
-	{
-		//Scene Viewport Rendering
-		ImVec2 viewportSize = ImGui::GetContentRegionAvail();
-
-		if (viewportSize.x > 0 && viewportSize.y > 0)
-		{
-			// Store the viewport size for later use
-			sceneViewport = viewportSize;
-
-			if (sceneCamera)
-			{
-				sceneCamera->SetProjectionMatrix(
-					60.0f, 
-					sceneViewport.x / sceneViewport.y, 
-					0.1f, 
-					1000.0f);
-			}
-		}
-	}
-	ImGui::End();
-
-	ImGui::Begin("Game");
-	{
-		//Game Viewport Rendering
-		ImVec2 viewportSize = ImGui::GetContentRegionAvail();
-
-		if (viewportSize.x > 0 && viewportSize.y > 0)
-		{
-			// Store the viewport size for later use
-			gameViewport = viewportSize;
-
-			if(gameCamera)
-			{
-				gameCamera->SetProjectionMatrix(
-					60.0f,
-					gameViewport.x / gameViewport.y,
-					0.1f,
-					1000.0f);
-			}
-		}
-	}
-	ImGui::End();
-
-	ImGui::Begin("Hierarchy");
-	ImGui::End();
-	
-	// Project
-	ImGui::Begin("Project");
-	ImGui::End();
-
-	ImGui::Begin("Console");
-	ImGui::End();
-
 	ImGui::Render();
 
 	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
@@ -208,17 +110,7 @@ void ImGuiManager::Render(ID3D12GraphicsCommandList* cmdList,
 	}
 }
 
-D3D12_VIEWPORT ImGuiManager::GetSceneViewportSize()
-{
-	return D3D12_VIEWPORT();
-}
-
-D3D12_VIEWPORT ImGuiManager::GetGameViewportSize()
-{
-	return D3D12_VIEWPORT();
-}
-
-D3D12_GPU_DESCRIPTOR_HANDLE ImGuiManager::RegisterTexture(ID3D12Device* pDevice, ID3D12Resource* pTextureResource)
+ImTextureID ImGuiManager::RegisterTexture(ID3D12Resource* pTextureResource)
 {
 	// Check if heap is full
 	if (m_currentHeapIndex >= m_totalHeapSize)
@@ -240,9 +132,8 @@ D3D12_GPU_DESCRIPTOR_HANDLE ImGuiManager::RegisterTexture(ID3D12Device* pDevice,
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
 
-	pDevice->CreateShaderResourceView(pTextureResource, &srvDesc, cpuHandle);
+	m_device->CreateShaderResourceView(pTextureResource, &srvDesc, cpuHandle);
 
 	m_currentHeapIndex++;
-
-	return gpuHandle;
+	return static_cast<ImTextureID>(gpuHandle.ptr);
 }

@@ -58,7 +58,7 @@ protected:
 	// 1. 게임에 특화된 리소스(PSO, 루트 시그니처, 메쉬)를 로드합니다.
 	bool InitBase(HWND hWnd, UINT width, UINT height);
 	// 2. 그리기 (커맨드 리스트 채우기)
-	virtual void DrawGame() = 0;
+	virtual void Render3DScene(const Camera& camera) = 0;
 	// 3. 창 크기 변경 시
 	virtual void OnResize(UINT width, UINT height) = 0;
 
@@ -70,8 +70,7 @@ protected:
 
 	// RTT(Render To Texture) 관련 함수
 	void CreateRttResources();
-	void Render3DScene(const Camera& camera);
-
+	
 	HINSTANCE m_hInstance;
 	HWND m_hWnd;
 
@@ -122,12 +121,12 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rttDsvHeap;  // 깊이 스텐실 뷰 힙
 
 	// Scene View RTT 리소스
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneTexture; // Scene 렌더 타겟 텍스처
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneDepthBuffer; // Scene 깊이 버퍼 텍스처
-	D3D12_CPU_DESCRIPTOR_HANDLE m_sceneRtvHandle; // RTT RTV 힙의 0번 슬롯
-	D3D12_CPU_DESCRIPTOR_HANDLE m_sceneDsvHandle; // RTT DSV 힙의 0번 슬롯
-	ImTextureID m_sceneViewImGuiHandle = 0; // ImGui용 텍스처 핸들
-	ImVec2 m_sceneViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_editorTexture; // Scene 렌더 타겟 텍스처
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_editorDepthBuffer; // Scene 깊이 버퍼 텍스처
+	D3D12_CPU_DESCRIPTOR_HANDLE m_editorRtvHandle; // RTT RTV 힙의 0번 슬롯
+	D3D12_CPU_DESCRIPTOR_HANDLE m_editorDsvHandle; // RTT DSV 힙의 0번 슬롯
+	ImTextureID m_editorViewImGuiHandle = 0; // ImGui용 텍스처 핸들
+	ImVec2 m_editorViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
 
 	// Game View RTT 리소스
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_gameTexture; // Scene 렌더 타겟 텍스처
@@ -139,4 +138,7 @@ protected:
 	ImVec2 m_gameViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
 #endif // _EDITOR_MODE
 
+private:
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferRtv() const;
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDsv() const;
 };

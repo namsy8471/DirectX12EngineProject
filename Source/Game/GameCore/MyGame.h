@@ -31,7 +31,7 @@ public:
 	virtual void Shutdown() override;
 
 protected:
-	void DrawGame();
+	virtual void Render3DScene(const Camera& camera) override;
 	virtual void OnResize(UINT width, UINT height) override;
 
 private:
