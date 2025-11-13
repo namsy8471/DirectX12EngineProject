@@ -1,2 +1,2 @@
 # DirectX12EngineProject
-Let's make Engine in DirectX12
+Date: 2025/11/01~
