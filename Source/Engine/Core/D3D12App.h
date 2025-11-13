@@ -103,6 +103,8 @@ protected:
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
 
+	Camera* m_gameCamera;	// Game View에 사용할 카메라 (게임이 할당해줘야 함)
+
 	// 게임 루프를 위한 타이머 추가
 	std::unique_ptr<class Timer> m_pTimer;
 
@@ -134,7 +136,6 @@ protected:
 	D3D12_CPU_DESCRIPTOR_HANDLE m_gameRtvHandle; // RTT RTV 힙의 1번 슬롯
 	D3D12_CPU_DESCRIPTOR_HANDLE m_gameDsvHandle; // RTT DSV 힙의 1번 슬롯
 	ImTextureID m_gameViewImGuiHandle = 0; // ImGui용 텍스처 핸들
-	Camera* m_gameCamera;	// Game View에 사용할 카메라 (게임이 할당해줘야 함)
 	ImVec2 m_gameViewportSize = { 1280, 720 }; // ImGui에 표시할 때의 크기
 #endif // _EDITOR_MODE
 

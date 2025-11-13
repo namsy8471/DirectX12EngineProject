@@ -151,13 +151,13 @@ void D3D12App::Render()
 	ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
 
 
-	auto barrierToRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(
+	auto barrierFromPresentToRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(
 		m_renderTargetBuffers[m_frameIndex].Get(),
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
 
-	m_commandList->ResourceBarrier(1, &barrierToRenderTarget);
+	m_commandList->ResourceBarrier(1, &barrierFromPresentToRenderTarget);
 
 #if defined(_EDITOR_MODE)
 	// ImGui

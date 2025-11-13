@@ -59,4 +59,7 @@ private:
 
 	D3D12_VERTEX_BUFFER_VIEW m_vbView;
 	D3D12_INDEX_BUFFER_VIEW m_ibView;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_constantBuffer; // 상수 버퍼
+	UINT8* m_pCbvDataBegin = nullptr; // 상수 버퍼 매핑 포인터
 };

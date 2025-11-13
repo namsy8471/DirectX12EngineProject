@@ -55,7 +55,7 @@ BOOL Window::InitInstance(int nCmdShow)
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, m_width, m_height,
         nullptr,
-        nullptr,//LoadMenu(m_hInst, MAKEINTRESOURCE(IDC_DIRECTX12ENGINEPROJECT)),
+        nullptr,
         m_hInst,
         this);
 
@@ -143,7 +143,7 @@ LRESULT Window::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 }
 
 // ImGui 윈도우 프로시저 핸들러 선언 (현재 imgui_impl_win32.h에 extern으로 선언되어 있음)
-// extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
 LRESULT CALLBACK Window::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

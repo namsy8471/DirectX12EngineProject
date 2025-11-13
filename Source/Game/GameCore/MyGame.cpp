@@ -42,16 +42,10 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 
 	Debug::Print(L"Shader Bytecode Load Complete!");
 
-	// Create Root Signature
-	D3D12_DESCRIPTOR_RANGE descriptorRange = {};
-	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptorRange.NumDescriptors = 1;
-	descriptorRange.BaseShaderRegister = 0; // b0
-
 	D3D12_ROOT_PARAMETER rootParameter = {};
-	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameter.DescriptorTable.NumDescriptorRanges = 1;
-	rootParameter.DescriptorTable.pDescriptorRanges = &descriptorRange;
+	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameter.Descriptor.RegisterSpace = 0;
+	rootParameter.Descriptor.ShaderRegister = 0; // b0 레지스터
 	rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
@@ -151,10 +145,29 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 	m_ibView.SizeInBytes = ibSize;
 	m_ibView.Format = DXGI_FORMAT_R32_UINT;
 
+	// Create CBV for WVP matrix
+	const UINT constantBufferSize = (sizeof(XMMATRIX) + 255) & ~255; // 256바이트 정렬
+	
+	// 업로드 힙 (CPU write, GPU Read)로 생성
+	auto cbHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto cbDesc = CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize);
+
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&cbHeapProps,
+		D3D12_HEAP_FLAG_NONE,
+		&cbDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_constantBuffer))
+	);
+
+	ThrowIfFailed(m_constantBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+
 	// Create Scene and Main Camera
 	m_activeScene = std::make_unique<Scene>("Main Scene");
 	Debug::Print(L"Scene and Editor Camera Created!");
 
+	// Create Main Camera in the Scene
 	if(m_activeScene)
 	{
 		GameObject* gameCamObj = m_activeScene->CreateGameObject("Main Camera");
@@ -163,6 +176,7 @@ bool MyGame::Init(HWND hWnd, UINT width, UINT height)
 		gameCam->Init();
 
 		m_activeScene->SetMainCamera(gameCam);
+		m_gameCamera = gameCam; // 부모 클래스의 멤버 포인터도 설정
 		Debug::Print(L"Main Camera Created in Scene!");
 
 		m_activeScene->CreateGameObject("Player");
@@ -186,20 +200,35 @@ void MyGame::Render3DScene(const Camera& camera)
 	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 	m_commandList->SetPipelineState(m_pso.Get());
 
-	XMMATRIX viewMatrix = camera.GetViewMatrix();
-	XMMATRIX projMatrix = camera.GetProjectionMatrix();
-	XMMATRIX wvp = XMMatrixIdentity() * viewMatrix * projMatrix;
-
 	// [게임] 리소스 바인딩 (ECS RenderSystem이 이 작업을 할 것입니다)
 	m_commandList->IASetVertexBuffers(0, 1, &m_vbView); // 정점 버퍼 설정
 	m_commandList->IASetIndexBuffer(&m_ibView); // 인덱스 버퍼 설정
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	// [게임] 그리기
-	m_commandList->DrawIndexedInstanced(
-		static_cast<UINT>(m_indices.size()),
-		1, 0, 0, 0
-	);
+	XMMATRIX viewMatrix = camera.GetViewMatrix();
+	XMMATRIX projMatrix = camera.GetProjectionMatrix();
+
+	if (!m_activeScene) return;
+
+	for (const auto& gameObject : m_activeScene->GetGameObjects())
+	{
+		// 게임 오브젝트의 변환 행렬을 가져옵니다.
+		XMMATRIX worldMatrix = gameObject->GetTransform()->GetWorldMatrix();
+
+		// WVP 행렬을 계산합니다.
+		XMMATRIX wvp = worldMatrix * viewMatrix * projMatrix;
+		wvp = XMMatrixTranspose(wvp); // 행렬을 전치합니다.
+
+		// 상수 버퍼에 WVP 행렬을 복사합니다.
+		memcpy(m_pCbvDataBegin, &wvp, sizeof(XMMATRIX));
+		m_commandList->SetGraphicsRootConstantBufferView(0, m_constantBuffer->GetGPUVirtualAddress());
+	
+		// [게임] 그리기
+		m_commandList->DrawIndexedInstanced(
+			static_cast<UINT>(m_indices.size()),
+			1, 0, 0, 0
+		);
+	}
 }
 
 // 엔진이 리사이즈를 끝낸 후 호출됩니다.

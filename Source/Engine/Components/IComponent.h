@@ -10,7 +10,7 @@ public:
 
 	// Interface methods
 	virtual void Init() {};
-	virtual void Update(float deltaTime) {}; 
+	virtual void Update([[maybe_unused]]float deltaTime) {};
 	GameObject* GetOwner() const { return m_owner; };
 
 private:
